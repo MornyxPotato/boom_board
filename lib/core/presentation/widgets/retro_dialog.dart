@@ -1,4 +1,5 @@
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
+import 'package:boom_board/core/style/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class RetroDialog extends StatelessWidget {
@@ -22,7 +23,7 @@ class RetroDialog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF282A36),
+          color: retroBackground,
           border: Border.all(color: Colors.white, width: 4),
           boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(8, 8))],
         ),
@@ -33,7 +34,7 @@ class RetroDialog extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFFF5555),
+                color: retroRed,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
@@ -53,12 +54,12 @@ class RetroDialog extends StatelessWidget {
               children: [
                 RetroButton(
                   text: 'NO',
-                  color: const Color(0xFFC5CAE9),
+                  color: retroPaleBlue,
                   onPressed: onCancel,
                 ),
                 RetroButton(
                   text: 'YES',
-                  color: const Color(0xFFFF5555),
+                  color: retroRed,
                   onPressed: onConfirm,
                 ),
               ],

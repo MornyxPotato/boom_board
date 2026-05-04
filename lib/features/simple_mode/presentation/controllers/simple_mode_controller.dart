@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:boom_board/core/data/models/coordinate.dart';
+import 'package:boom_board/core/data/models/enums/game_mode.dart';
 import 'package:boom_board/core/domain/use_cases/get_current_player_id_use_case.dart';
+import 'package:boom_board/core/domain/use_cases/leave_room_use_case.dart';
 import 'package:boom_board/core/events/event_bus.dart';
 import 'package:boom_board/core/events/models/socket_connected_error_event.dart';
 import 'package:boom_board/core/events/models/socket_disconnected_event.dart';
@@ -181,6 +183,14 @@ class SimpleModeController extends GetxController {
     }
   }
 
+  void leaveRoom() async {
+    try {
+      await GetIt.I<LeaveRoomUseCase>().call(LeaveRoomParams(gameMode: GameMode.simple));
+    } catch (e, stackTrace) {
+      logger.e('leaveRoom error.', error: e, stackTrace: stackTrace);
+    }
+  }
+
   void onPlayerJoinedEventReceived(PlayerJoinedEvent event) {
     logger.d('onPlayerJoinedEventReceived called with $event');
     playerList = event.playerList;
@@ -302,7 +312,7 @@ class SimpleModeController extends GetxController {
     Get.snackbar(
       'Connection Lost',
       'You have been disconnected from the server.',
-      backgroundColor: errorColor,
+      backgroundColor: retroRed,
       colorText: textOrIconColor,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(16),

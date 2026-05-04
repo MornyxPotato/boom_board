@@ -133,6 +133,8 @@ class HomeController extends GetxController {
             playerList: result.playerList.toSimpleModeEntity(),
           ),
         );
+        // Reset home screen.
+        onCancelPressed();
       }
     } on BBServerException catch (e, stackTrace) {
       logger.e('SimpleModeCreateRoomUseCase BBServerException error.', error: e, stackTrace: stackTrace);
@@ -183,6 +185,8 @@ class HomeController extends GetxController {
             playerList: result.playerList.toSimpleModeEntity(),
           ),
         );
+        // Reset home screen.
+        onCancelPressed();
       }
     } on BBServerException catch (e, stackTrace) {
       logger.e('SimpleModeJoinRoomUseCase BBServerException error.', error: e, stackTrace: stackTrace);

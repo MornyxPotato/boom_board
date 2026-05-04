@@ -1,3 +1,4 @@
+import 'package:boom_board/core/style/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class RetroButton extends StatefulWidget {
@@ -9,7 +10,7 @@ class RetroButton extends StatefulWidget {
     super.key,
     required this.text,
     required this.onPressed,
-    this.color = const Color(0xFFC5CAE9),
+    this.color = retroPaleBlue,
   });
 
   @override
@@ -58,6 +59,7 @@ class _RetroButtonState extends State<RetroButton> {
           ),
           child: Text(
             widget.text,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.bold,

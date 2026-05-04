@@ -1,5 +1,6 @@
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
 import 'package:boom_board/core/presentation/widgets/retro_text_field.dart';
+import 'package:boom_board/core/style/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class JoinPanel extends StatelessWidget {
@@ -42,7 +43,7 @@ class JoinPanel extends StatelessWidget {
               errorText!,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFFF5555),
+                color: retroRed,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
@@ -55,13 +56,13 @@ class JoinPanel extends StatelessWidget {
           children: [
             RetroButton(
               text: 'Back',
-              color: const Color(0xFFFF5555),
+              color: retroRed,
               onPressed: onCancelPressed,
             ),
             const SizedBox(width: 16),
             RetroButton(
               text: 'Join',
-              color: const Color(0xFF8BE9FD),
+              color: retroCyan,
               onPressed: onJoinConfirmPressed,
             ),
           ],

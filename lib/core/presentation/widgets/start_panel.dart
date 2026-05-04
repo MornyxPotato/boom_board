@@ -1,4 +1,5 @@
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
+import 'package:boom_board/core/style/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class StartPanel extends StatelessWidget {
@@ -18,13 +19,13 @@ class StartPanel extends StatelessWidget {
       children: [
         RetroButton(
           text: 'Host Game',
-          color: const Color(0xFF50FA7B),
+          color: retroGreen,
           onPressed: onHostPressed,
         ),
         const SizedBox(height: 24),
         RetroButton(
           text: 'Join Game',
-          color: const Color(0xFF8BE9FD),
+          color: retroCyan,
           onPressed: onJoinPressed,
         ),
       ],

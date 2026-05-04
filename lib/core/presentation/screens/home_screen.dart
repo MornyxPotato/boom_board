@@ -14,7 +14,7 @@ class HomeScreen extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF282A36),
+      backgroundColor: retroBackground,
       body: Stack(
         children: [
           SizedBox(
@@ -47,6 +47,17 @@ class HomeScreen extends GetView<HomeController> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // The Silent Tutorial Tagline
+                  const Text(
+                    '> HIDE. > SURVIVE. > DESTROY.',
+                    style: TextStyle(
+                      color: retroGreen,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
+                    ),
+                  ),
                   const SizedBox(height: 60),
 
                   // --- CONNECTION STATUS ---
@@ -58,7 +69,7 @@ class HomeScreen extends GetView<HomeController> {
                           padding: EdgeInsets.only(bottom: 24),
                           child: RetroLoadingText(
                             text: 'Connecting',
-                            color: Color(0xFFF1FA8C), // A retro yellow color
+                            color: retroYellow,
                           ),
                         );
                       }
@@ -74,7 +85,7 @@ class HomeScreen extends GetView<HomeController> {
                           child: Text(
                             'SERVER OFFLINE',
                             style: TextStyle(
-                              color: errorColor,
+                              color: retroRed,
                               fontWeight: FontWeight.bold,
                               fontSize: 20,
                             ),
