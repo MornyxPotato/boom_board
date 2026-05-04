@@ -1,4 +1,4 @@
-import 'package:boom_board/core/presentation/widgets/app_text_button.dart';
+import 'package:boom_board/core/presentation/widgets/retro_button.dart';
 import 'package:flutter/material.dart';
 
 class StartPanel extends StatelessWidget {
@@ -16,13 +16,15 @@ class StartPanel extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppTextButton(
-          buttonText: 'Host',
+        RetroButton(
+          text: 'Host Game',
+          color: const Color(0xFF50FA7B),
           onPressed: onHostPressed,
         ),
-        const SizedBox(height: 16),
-        AppTextButton(
-          buttonText: 'Join',
+        const SizedBox(height: 24),
+        RetroButton(
+          text: 'Join Game',
+          color: const Color(0xFF8BE9FD),
           onPressed: onJoinPressed,
         ),
       ],

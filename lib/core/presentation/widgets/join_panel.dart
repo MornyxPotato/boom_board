@@ -1,13 +1,13 @@
-import 'package:boom_board/core/presentation/widgets/app_text_button.dart';
-import 'package:boom_board/core/style/app_colors.dart';
+import 'package:boom_board/core/presentation/widgets/retro_button.dart';
+import 'package:boom_board/core/presentation/widgets/retro_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 class JoinPanel extends StatelessWidget {
   final TextEditingController playerNameTextCtl;
   final TextEditingController roomCodeTextCtl;
   final Function() onCancelPressed;
   final Function() onJoinConfirmPressed;
+  final String? errorText;
 
   const JoinPanel({
     super.key,
@@ -15,6 +15,7 @@ class JoinPanel extends StatelessWidget {
     required this.roomCodeTextCtl,
     required this.onCancelPressed,
     required this.onJoinConfirmPressed,
+    this.errorText,
   });
 
   @override
@@ -23,61 +24,44 @@ class JoinPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          'Join',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: textOrIconColor,
-          ),
+        RetroTextField(
+          controller: playerNameTextCtl,
+          hintText: 'Player Name',
+          maxLength: 20,
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: Get.width * 0.25,
-          child: TextField(
-            controller: playerNameTextCtl,
-            decoration: InputDecoration(
-              labelText: 'Player name',
-              labelStyle: TextStyle(color: primaryTextColor),
-              constraints: BoxConstraints(),
-              fillColor: lightPrimaryColor,
-              filled: true,
-              border: InputBorder.none,
-            ),
-            maxLength: 20,
-            style: TextStyle(
-              color: primaryTextColor,
-            ),
-          ),
+        RetroTextField(
+          controller: roomCodeTextCtl,
+          hintText: 'Room Code',
+          maxLength: 4,
+          isRoomCode: true,
         ),
-        SizedBox(
-          width: Get.width * 0.25,
-          child: TextField(
-            controller: roomCodeTextCtl,
-            decoration: InputDecoration(
-              labelText: 'Room Code',
-              labelStyle: TextStyle(color: primaryTextColor),
-              constraints: BoxConstraints(),
-              fillColor: lightPrimaryColor,
-              filled: true,
-              border: InputBorder.none,
-            ),
-            maxLength: 4,
-            style: TextStyle(
-              color: primaryTextColor,
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              errorText!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFFF5555),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
+              ),
             ),
           ),
-        ),
+        const SizedBox(height: 16),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppTextButton(
-              buttonText: 'Cancel',
+            RetroButton(
+              text: 'Back',
+              color: const Color(0xFFFF5555),
               onPressed: onCancelPressed,
             ),
             const SizedBox(width: 16),
-            AppTextButton(
-              buttonText: 'Join',
+            RetroButton(
+              text: 'Join',
+              color: const Color(0xFF8BE9FD),
               onPressed: onJoinConfirmPressed,
             ),
           ],

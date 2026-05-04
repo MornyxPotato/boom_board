@@ -1,18 +1,19 @@
-import 'package:boom_board/core/presentation/widgets/app_text_button.dart';
-import 'package:boom_board/core/style/app_colors.dart';
+import 'package:boom_board/core/presentation/widgets/retro_button.dart';
+import 'package:boom_board/core/presentation/widgets/retro_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 class HostPanel extends StatelessWidget {
   final TextEditingController textEditingCtl;
   final Function() onCancelPressed;
   final Function() onCreatePressed;
+  final String? errorText;
 
   const HostPanel({
     super.key,
     required this.textEditingCtl,
     required this.onCancelPressed,
     required this.onCreatePressed,
+    this.errorText,
   });
 
   @override
@@ -21,43 +22,37 @@ class HostPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          'Host',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: textOrIconColor,
-          ),
+        RetroTextField(
+          controller: textEditingCtl,
+          hintText: 'Player Name',
+          maxLength: 20,
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: Get.width * 0.25,
-          child: TextField(
-            controller: textEditingCtl,
-            decoration: InputDecoration(
-              labelText: 'Player name',
-              labelStyle: TextStyle(color: primaryTextColor),
-              constraints: BoxConstraints(),
-              fillColor: lightPrimaryColor,
-              filled: true,
-              border: InputBorder.none,
-            ),
-            maxLength: 20,
-            style: TextStyle(
-              color: primaryTextColor,
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              errorText!,
+              style: const TextStyle(
+                color: Color(0xFFFF5555),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
+              ),
             ),
           ),
-        ),
+        const SizedBox(height: 16),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppTextButton(
-              buttonText: 'Cancel',
+            RetroButton(
+              text: 'Back',
+              color: const Color(0xFFFF5555),
               onPressed: onCancelPressed,
             ),
             const SizedBox(width: 16),
-            AppTextButton(
-              buttonText: 'Create',
+            RetroButton(
+              text: 'Create',
+              color: const Color(0xFF50FA7B),
               onPressed: onCreatePressed,
             ),
           ],

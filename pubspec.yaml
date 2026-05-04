@@ -29,3 +29,8 @@ flutter:
 
   assets:
     - .env
+
+  fonts:
+    - family: PressStart2P
+      fonts:
+        - asset: assets/fonts/PressStart2P-Regular.ttf

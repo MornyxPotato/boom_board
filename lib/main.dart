@@ -20,6 +20,9 @@ class MyApp extends StatelessWidget {
       title: 'Boom Board',
       initialRoute: home,
       getPages: getRoutes(),
+      theme: ThemeData(
+        fontFamily: 'PressStart2P',
+      ),
     );
   }
 }
