@@ -1,0 +1,23 @@
+import 'package:boom_board/core/data/models/coordinate.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/explosion_result_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
+
+class RoundResolvedEvent {
+  final List<ExplosionResultEntity> explosionList;
+  final List<SimpleModePlayerEntity> playerList;
+  final List<Coordinate> destroyedTiles;
+  final List<ActionLogEntity> newLogs;
+
+  RoundResolvedEvent({
+    required this.explosionList,
+    required this.playerList,
+    required this.destroyedTiles,
+    required this.newLogs,
+  });
+
+  @override
+  String toString() {
+    return 'RoundResolvedEvent explosionList: $explosionList, playerList: $playerList, destroyedTiles: $destroyedTiles, newLogs: $newLogs';
+  }
+}

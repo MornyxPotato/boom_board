@@ -1,0 +1,1 @@
+class InvalidSocketResponseException implements Exception {}
