@@ -4,6 +4,7 @@ import 'package:boom_board/core/presentation/widgets/retro_dialog.dart';
 import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -152,11 +153,15 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                         itemCount: ctl.playerList.length,
                         itemBuilder: (context, index) {
                           final player = ctl.playerList[index];
+
+                          // Dead players get a dark red background, alive players get black
+                          final backgroundColor = player.isAlive ? Colors.black : retroRed.withAlpha(51);
+
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: player.isAlive ? Colors.black : Colors.red[900],
+                              color: backgroundColor,
                               border: Border.all(
                                 color: player.id == controller.hostId ? retroYellow : Colors.white,
                                 width: 2,
@@ -165,21 +170,21 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  player.name.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
+                                // Player Name
+                                Expanded(
+                                  child: Text(
+                                    player.name,
+                                    style: TextStyle(
+                                      // Dim the text if they are dead or disconnected
+                                      color: (player.isAlive && !player.isDisconnected) ? Colors.white : Colors.grey,
+                                      fontSize: 16,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                // Placeholder for Status Icons (Checkmarks, Skulls, etc.)
-                                Text(
-                                  player.hasPositioned ? '[OK]' : '[..]',
-                                  style: const TextStyle(
-                                    color: retroGreen,
-                                    fontSize: 20,
-                                  ),
-                                ),
+
+                                // The Dynamic Status Icon
+                                _buildPlayerStatusIcon(player, ctl.currentState),
                               ],
                             ),
                           );
@@ -388,5 +393,38 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
         ),
       ],
     );
+  }
+
+  // --- PLAYER STATUS ICON LOGIC ---
+  Widget _buildPlayerStatusIcon(SimpleModePlayerEntity player, GameState currentState) {
+    // Highest Priority: Disconnected
+    if (player.isDisconnected) {
+      // TODO Replace this with disconnect icon
+      return const Icon(Icons.power_off, color: Colors.grey, size: 24);
+    }
+
+    // Second Priority: Dead
+    if (!player.isAlive) {
+      // TODO Replace this with dead icon
+      return const Icon(Icons.close, color: retroRed, size: 28);
+    }
+
+    // Alive & Active Phases
+    if (currentState == GameState.position) {
+      // TODO Replace this with ready / check mark icon
+      return player.hasPositioned
+          ? const Icon(Icons.check_box, color: retroGreen, size: 24)
+          : const Icon(Icons.check_box_outline_blank, color: Colors.grey, size: 24);
+    }
+
+    if (currentState == GameState.attack) {
+      // TODO Replace this with ready / check mark icon
+      return player.hasThrowBomb
+          ? const Icon(Icons.gps_fixed, color: retroRed, size: 24) // Target locked!
+          : const Icon(Icons.gps_not_fixed, color: Colors.grey, size: 24);
+    }
+
+    // Lobby, Process, or End phases (just show nothing if they are alive and fine)
+    return const SizedBox(width: 24, height: 24);
   }
 }

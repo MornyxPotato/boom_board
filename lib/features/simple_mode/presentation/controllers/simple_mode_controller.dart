@@ -163,6 +163,7 @@ class SimpleModeController extends GetxController {
       if (index != 1) {
         playerList[index] = playerList[index].copyWith(hasPositioned: true);
       }
+      update([SimpleModeIds.playerListPanel]);
     } catch (e, stackTrace) {
       logger.e('setPosition error.', error: e, stackTrace: stackTrace);
     }
@@ -185,6 +186,7 @@ class SimpleModeController extends GetxController {
       if (index != 1) {
         playerList[index] = playerList[index].copyWith(hasThrowBomb: true);
       }
+      update([SimpleModeIds.playerListPanel]);
     } catch (e, stackTrace) {
       logger.e('throwBomb error.', error: e, stackTrace: stackTrace);
     }
