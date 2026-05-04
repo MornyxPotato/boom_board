@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 class RetroLoadingText extends StatefulWidget {
   final String text;
   final Color color;
+  final double? fontSize;
 
   const RetroLoadingText({
     super.key,
     this.text = 'LOADING',
     this.color = Colors.white,
+    this.fontSize,
   });
 
   @override
@@ -51,7 +53,7 @@ class _RetroLoadingTextState extends State<RetroLoadingText> {
       style: TextStyle(
         color: widget.color,
         fontWeight: FontWeight.bold,
-        fontSize: 24,
+        fontSize: widget.fontSize ?? 24,
       ),
     );
   }

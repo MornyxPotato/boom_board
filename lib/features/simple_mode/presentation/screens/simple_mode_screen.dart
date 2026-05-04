@@ -1,6 +1,9 @@
+import 'package:boom_board/core/data/models/coordinate.dart';
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
 import 'package:boom_board/core/presentation/widgets/retro_dialog.dart';
+import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
 import 'package:boom_board/core/style/app_colors.dart';
+import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -82,14 +85,57 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                   child: GetBuilder<SimpleModeController>(
                     id: SimpleModeIds.controlPanel,
                     builder: (ctl) {
-                      return Text(
-                        'PHASE: ${ctl.currentState.toString().toUpperCase()}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      return Column(
+                        children: [
+                          if (ctl.currentState != GameState.lobby && ctl.currentState != GameState.end)
+                            Text(
+                              'PHASE:${ctl.currentState.toString().toUpperCase()}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                              ),
+                            ),
+                          // LOBBY CONTROLS (Start Game)
+                          if (ctl.currentState == GameState.lobby) ...[
+                            if (ctl.isHost)
+                              RetroButton(
+                                text: 'Start game',
+                                color: retroGreen,
+                                onPressed: controller.startGame,
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: const RetroLoadingText(
+                                  text: 'Waiting for host',
+                                  color: retroYellow,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            if (ctl.isHost) const SizedBox(height: 4),
+                          ],
+
+                          // ENDGAME CONTROLS (Play Again)
+                          if (ctl.currentState == GameState.end) ...[
+                            if (ctl.isHost)
+                              RetroButton(
+                                text: 'Play again',
+                                color: retroCyan,
+                                onPressed: controller.backToLobby,
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: const RetroLoadingText(
+                                  text: 'Waiting for host',
+                                  color: retroYellow,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            if (ctl.isHost) const SizedBox(height: 4),
+                          ],
+                        ],
                       );
                     },
                   ),
@@ -198,19 +244,22 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Top Coordinates (A-H)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(width: tileSize), // Corner spacer
-            ...columns.map(
-              (c) => SizedBox(
-                width: tileSize,
-                child: Center(
-                  child: Text(c, style: const TextStyle(color: Colors.grey, fontSize: 24)),
+        Padding(
+          padding: EdgeInsets.only(left: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: tileSize), // Corner spacer
+              ...columns.map(
+                (c) => SizedBox(
+                  width: tileSize,
+                  child: Center(
+                    child: Text(c, style: const TextStyle(color: Colors.grey, fontSize: 24)),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
 
         // The Middle Section (Numbers + Board)
@@ -223,6 +272,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                   .map(
                     (r) => SizedBox(
                       height: tileSize,
+                      width: tileSize,
                       child: Center(
                         child: Text(r, style: const TextStyle(color: Colors.grey, fontSize: 24)),
                       ),
@@ -240,24 +290,95 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
               child: SizedBox(
                 width: tileSize * 8,
                 height: tileSize * 8,
-                // We use a GridView for easy X/Y plotting later
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(), // No scrolling allowed
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                  ),
-                  itemCount: 64,
-                  itemBuilder: (context, index) {
-                    // Calculate X (column) and Y (row) from 0-7
-                    final x = index % 8;
-                    final y = index ~/ 8;
+                child: GetBuilder<SimpleModeController>(
+                  id: SimpleModeIds.boardPanel,
+                  builder: (ctl) {
+                    final localPlayer = ctl.localPlayer;
+                    final isPositionPhase = ctl.currentState == GameState.position;
+                    final isAttackPhase = ctl.currentState == GameState.attack;
 
-                    // Checkerboard pattern for that classic strategy look
-                    final isDark = (x + y) % 2 == 1;
+                    return GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 8,
+                      ),
+                      itemCount: 64,
+                      itemBuilder: (context, index) {
+                        final x = index % 8;
+                        final y = index ~/ 8;
+                        final isDark = (x + y) % 2 == 1;
 
-                    return Container(
-                      color: isDark ? retroGrey : retroGridLight,
-                      // We will add the MouseRegion and InkWell here in Phase 2
+                        // Check tile states
+                        final isDestroyed = ctl.destroyedTile.any((t) => t.x == x && t.y == y);
+                        final isHovered = ctl.hoveredTile?.x == x && ctl.hoveredTile?.y == y;
+
+                        // Check if the local player is allowed to interact with this tile right now
+                        bool canInteract = false;
+                        if (!isDestroyed && localPlayer != null && localPlayer.isAlive) {
+                          if (isPositionPhase && !localPlayer.hasPositioned) canInteract = true;
+                          if (isAttackPhase && !localPlayer.hasThrowBomb) canInteract = true;
+                        }
+
+                        // Determine the cursor
+                        SystemMouseCursor cursor = SystemMouseCursors.basic;
+                        if (isDestroyed) {
+                          cursor = SystemMouseCursors.forbidden; // Red circle with a slash
+                        } else if (canInteract) {
+                          cursor = SystemMouseCursors.click; // Pointing finger
+                        }
+
+                        return MouseRegion(
+                          cursor: cursor,
+                          onEnter: (_) {
+                            if (canInteract) ctl.setHoveredTile(Coordinate(x: x, y: y));
+                          },
+                          onExit: (_) {
+                            if (canInteract) ctl.setHoveredTile(null);
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              if (!canInteract) return;
+                              if (isPositionPhase) ctl.setPosition(x, y);
+                              if (isAttackPhase) ctl.throwBomb(x, y);
+                            },
+                            child: Container(
+                              color: isDark ? retroGrey : retroGridLight,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // --- DESTROYED TILE EFFECT (Laser fire) ---
+                                  if (isDestroyed)
+                                    Container(
+                                      color: Colors.orange.withAlpha(
+                                        128,
+                                      ), // TODO replace this with fire animation gif
+                                      child: const Center(
+                                        child: Icon(Icons.local_fire_department, color: retroRed, size: 32),
+                                      ),
+                                    ),
+
+                                  // --- HOVER EFFECTS ---
+                                  if (isHovered && canInteract)
+                                    if (isPositionPhase)
+                                      // Ghost Character (position Phase)
+                                      const Icon(
+                                        Icons.android, // TODO replace this with player character
+                                        color: retroCyan,
+                                        size: 40,
+                                      )
+                                    else if (isAttackPhase)
+                                      // Target reticle (Bomb Phase)
+                                      const Icon(
+                                        Icons.gps_fixed, // Target reticle icon
+                                        color: retroRed,
+                                        size: 40,
+                                      ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

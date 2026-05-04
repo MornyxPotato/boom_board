@@ -45,7 +45,7 @@ class SimpleModeController extends GetxController {
   List<SimpleModePlayerEntity> playerList = [];
   List<ActionLogEntity> actionLogList = [];
   List<Coordinate> destroyedTile = [];
-  TextEditingController textEditingController = TextEditingController();
+  Coordinate? hoveredTile;
 
   StreamSubscription? playerJoinEventSubs;
   StreamSubscription? playerLeftEventSubs;
@@ -60,7 +60,19 @@ class SimpleModeController extends GetxController {
   StreamSubscription? socketErrorSubs;
 
   bool get isHost {
-    return hostId == GetIt.I<GetCurrentPlayerIdUseCase>().call();
+    return hostId == localPlayerId;
+  }
+
+  String get localPlayerId {
+    return GetIt.I<GetCurrentPlayerIdUseCase>().call() ?? '';
+  }
+
+  SimpleModePlayerEntity? get localPlayer {
+    try {
+      return playerList.firstWhere((p) => p.id == localPlayerId);
+    } catch (e) {
+      return null;
+    }
   }
 
   Logger get logger {
@@ -133,19 +145,21 @@ class SimpleModeController extends GetxController {
     }
   }
 
-  void setPosition() async {
+  void setPosition(int x, int y) async {
     try {
-      final String text = textEditingController.text;
-      final data = text.split(',');
+      if (localPlayer?.hasPositioned == true) return;
+
+      // Optimistic UI update: instantly hide the hover effect
+      setHoveredTile(null);
+
       await GetIt.I<SetPositionUseCase>().call(
         SetPositionParams(
           roomCode: roomCode,
-          x: int.parse(data.first),
-          y: int.parse(data.last),
+          x: x,
+          y: y,
         ),
       );
-      textEditingController.clear();
-      final index = playerList.indexWhere((e) => e.id == GetIt.I<GetCurrentPlayerIdUseCase>().call());
+      final index = playerList.indexWhere((e) => e.id == localPlayerId);
       if (index != 1) {
         playerList[index] = playerList[index].copyWith(hasPositioned: true);
       }
@@ -154,22 +168,23 @@ class SimpleModeController extends GetxController {
     }
   }
 
-  void throwBomb() async {
+  void throwBomb(int x, int y) async {
     try {
-      final String text = textEditingController.text;
-      final data = text.split(',');
+      if (localPlayer?.hasThrowBomb == true) return;
+
+      setHoveredTile(null);
+
       await GetIt.I<ThrowBombUseCase>().call(
         ThrowBombParams(
           roomCode: roomCode,
-          x: int.parse(data.first),
-          y: int.parse(data.last),
+          x: x,
+          y: y,
         ),
       );
-      final index = playerList.indexWhere((e) => e.id == GetIt.I<GetCurrentPlayerIdUseCase>().call());
+      final index = playerList.indexWhere((e) => e.id == localPlayerId);
       if (index != 1) {
         playerList[index] = playerList[index].copyWith(hasThrowBomb: true);
       }
-      textEditingController.clear();
     } catch (e, stackTrace) {
       logger.e('throwBomb error.', error: e, stackTrace: stackTrace);
     }
@@ -246,7 +261,7 @@ class SimpleModeController extends GetxController {
       update([SimpleModeIds.playerListPanel]);
     }
 
-    update([SimpleModeIds.controlPanel]);
+    update([SimpleModeIds.controlPanel, SimpleModeIds.boardPanel]);
   }
 
   void onRoundResolvedEventReceived(RoundResolvedEvent event) async {
@@ -317,5 +332,10 @@ class SimpleModeController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(16),
     );
+  }
+
+  void setHoveredTile(Coordinate? tile) {
+    hoveredTile = tile;
+    update([SimpleModeIds.boardPanel]);
   }
 }
