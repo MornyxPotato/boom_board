@@ -47,6 +47,7 @@ class SimpleModeController extends GetxController {
   List<Coordinate> destroyedTile = [];
   Coordinate? hoveredTile;
 
+  final ScrollController logScrollController = ScrollController();
   StreamSubscription? playerJoinEventSubs;
   StreamSubscription? playerLeftEventSubs;
   StreamSubscription? playerReadyEventSubs;
@@ -246,6 +247,8 @@ class SimpleModeController extends GetxController {
     hostId = event.newHostId;
     actionLogList.addAll(event.newLogs);
     update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel, SimpleModeIds.controlPanel]);
+
+    _scrollToBottom();
   }
 
   void onGameStartEventReceived(GameStartedEvent event) {
@@ -303,12 +306,14 @@ class SimpleModeController extends GetxController {
       }
     }
 
-    // 4. Final Sync: Ensure our local list perfectly matches the server's master list
+    // Final Sync: Ensure our local list perfectly matches the server's master list
     playerList = event.playerList;
     actionLogList.addAll(event.newLogs);
 
     // We don't update state to 'attack' here, we wait for the server's PhaseChangedEvent
     update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel]);
+
+    _scrollToBottom();
   }
 
   void onGameOverEventReceived(GameOverEvent event) {
@@ -346,5 +351,19 @@ class SimpleModeController extends GetxController {
   void setHoveredTile(Coordinate? tile) {
     hoveredTile = tile;
     update([SimpleModeIds.boardPanel]);
+  }
+
+  void _scrollToBottom() {
+    // We use addPostFrameCallback because we need to wait for Flutter to
+    // actually build the new log text widgets before we can scroll past them!
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (logScrollController.hasClients) {
+        logScrollController.animateTo(
+          logScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 }

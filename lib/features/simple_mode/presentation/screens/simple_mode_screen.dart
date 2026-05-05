@@ -4,6 +4,8 @@ import 'package:boom_board/core/presentation/widgets/retro_dialog.dart';
 import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
+import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
 import 'package:flutter/material.dart';
@@ -207,15 +209,10 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                       id: SimpleModeIds.actionLogPanel,
                       builder: (ctl) {
                         return ListView.builder(
+                          controller: ctl.logScrollController,
                           itemCount: ctl.actionLogList.length,
                           itemBuilder: (context, index) {
-                            return Text(
-                              '> ${ctl.actionLogList[index].type}',
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 16,
-                              ),
-                            );
+                            return _buildLogEntry(ctl.actionLogList[index]);
                           },
                         );
                       },
@@ -446,5 +443,101 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
 
     // Lobby, Process, or End phases (just show nothing if they are alive and fine)
     return const SizedBox(width: 24, height: 24);
+  }
+
+  // --- ACTION LOG FORMATTER ---
+  Widget _buildLogEntry(ActionLogEntity log) {
+    String prefix = '';
+    Color prefixColor = Colors.white;
+    List<InlineSpan> messageSpans = [];
+
+    // Convert 0-7 coordinates to A-H and 1-8
+    String getCoord(int x, int y) {
+      final col = String.fromCharCode('A'.codeUnitAt(0) + x);
+      final row = (y + 1).toString();
+      return '$col$row';
+    }
+
+    // Helper to generate a colored TextSpan for coordinates
+    TextSpan coordText(int x, int y) {
+      return TextSpan(
+        text: getCoord(x, y),
+        style: const TextStyle(color: retroCyan),
+      );
+    }
+
+    try {
+      switch (log.type) {
+        case LogActionType.bombExploded:
+          final data = log.getLogBombExplodedData();
+          prefix = '[BOMB]';
+          prefixColor = retroYellow;
+          messageSpans = [
+            TextSpan(text: ' ${data.bomberName} struck '),
+            coordText(data.x, data.y),
+            const TextSpan(text: '.'),
+          ];
+          break;
+        case LogActionType.playerEliminated:
+          final data = log.getLogPlayerEliminatedData();
+          prefix = '[KILL]';
+          prefixColor = retroRed;
+          messageSpans = [
+            TextSpan(text: ' ${data.victimName} eliminated by ${data.bomberName}!'),
+          ];
+          break;
+        case LogActionType.orbitalLaserFired:
+          final data = log.getLogOrbitalLaserFiredData();
+          prefix = '[LASER]';
+          prefixColor = retroOrange;
+          messageSpans = [
+            const TextSpan(text: ' Orbital strike scorched '),
+          ];
+          // Loop through all destroyed tiles and add them with commas
+          for (int i = 0; i < data.tiles.length; i++) {
+            messageSpans.add(coordText(data.tiles[i].x, data.tiles[i].y));
+            if (i < data.tiles.length - 1) {
+              messageSpans.add(const TextSpan(text: ', '));
+            }
+          }
+          messageSpans.add(const TextSpan(text: '.'));
+          break;
+        case LogActionType.playerDisconnected:
+          final data = log.getLogPlayerDisconnectedData();
+          prefix = '[DC]';
+          prefixColor = Colors.grey;
+          messageSpans = [
+            TextSpan(text: ' ${data.playerName} lost connection.'),
+          ];
+          break;
+      }
+    } catch (e) {
+      // Fallback just in case parsing fails
+      prefix = '[SYS]';
+      prefixColor = Colors.grey;
+      messageSpans = [
+        const TextSpan(text: ' Unknown event occurred.'),
+      ];
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text.rich(
+        TextSpan(
+          style: const TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
+          children: [
+            const TextSpan(
+              text: '> ',
+              style: TextStyle(color: retroGreen),
+            ),
+            TextSpan(
+              text: prefix,
+              style: TextStyle(color: prefixColor),
+            ),
+            ...messageSpans, // Unpack the array of spans directly into the text!
+          ],
+        ),
+      ),
+    );
   }
 }
