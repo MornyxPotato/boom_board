@@ -23,11 +23,16 @@ class SimpleModeSocketService {
     );
   }
 
-  Future<void> throwBomb(ThrowBombRequest request) async {
-    await socketService.emitSocket(
+  Future<ThrowBombResponse?> throwBomb(ThrowBombRequest request) async {
+    final res = await socketService.emitSocket(
       actionName: 'throwBomb',
       data: request.toJson(),
     );
+
+    if (res.data != null) {
+      return ThrowBombResponse.fromJson(res.data!);
+    }
+    return null;
   }
 
   Future<void> resetGame(ResetGameRequest request) async {

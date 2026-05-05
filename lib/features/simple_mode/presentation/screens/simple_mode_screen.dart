@@ -418,10 +418,30 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
     }
 
     if (currentState == GameState.attack) {
-      // TODO Replace this with ready / check mark icon
-      return player.hasThrowBomb
-          ? const Icon(Icons.gps_fixed, color: retroRed, size: 24) // Target locked!
-          : const Icon(Icons.gps_not_fixed, color: Colors.grey, size: 24);
+      if (player.hasThrowBomb) {
+        int? throwOrder = player.throwOrder;
+        if (throwOrder != null) throwOrder += 1;
+        return Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: retroRed,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(2, 2))],
+          ),
+          child: Text(
+            '${throwOrder ?? '-'}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+            ),
+          ),
+        );
+      } else {
+        // TODO Replace this with ready / check mark icon
+        return const Icon(Icons.gps_not_fixed, color: Colors.grey, size: 24);
+      }
     }
 
     // Lobby, Process, or End phases (just show nothing if they are alive and fine)

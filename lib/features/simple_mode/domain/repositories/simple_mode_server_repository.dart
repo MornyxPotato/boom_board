@@ -8,7 +8,7 @@ abstract class SimpleModeServerRepository {
 
   Future<void> setPosition(SetPositionRequest request);
 
-  Future<void> throwBomb(ThrowBombRequest request);
+  Future<ThrowBombResponse?> throwBomb(ThrowBombRequest request);
 
   Future<void> resetGame(ResetGameRequest request);
 }

@@ -17,3 +17,13 @@ class ThrowBombRequest {
     };
   }
 }
+
+class ThrowBombResponse {
+  final int throwOrder;
+
+  ThrowBombResponse({required this.throwOrder});
+
+  static ThrowBombResponse fromJson(Map<String, dynamic> json) {
+    return ThrowBombResponse(throwOrder: json['throwOrder']);
+  }
+}

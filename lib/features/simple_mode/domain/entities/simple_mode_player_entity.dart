@@ -7,6 +7,7 @@ class SimpleModePlayerEntity {
   final bool isDisconnected;
   final int? x;
   final int? y;
+  final int? throwOrder;
 
   SimpleModePlayerEntity({
     required this.id,
@@ -17,6 +18,7 @@ class SimpleModePlayerEntity {
     required this.isDisconnected,
     this.x,
     this.y,
+    this.throwOrder,
   });
 
   SimpleModePlayerEntity copyWith({
@@ -28,6 +30,8 @@ class SimpleModePlayerEntity {
     bool? isDisconnected,
     int? x,
     int? y,
+    int? throwOrder,
+    bool clearThrowOrder = false,
   }) {
     return SimpleModePlayerEntity(
       id: id ?? this.id,
@@ -38,11 +42,12 @@ class SimpleModePlayerEntity {
       isDisconnected: isDisconnected ?? this.isDisconnected,
       x: x ?? this.x,
       y: y ?? this.y,
+      throwOrder: clearThrowOrder ? null : (throwOrder ?? this.throwOrder),
     );
   }
 
   @override
   String toString() {
-    return 'SimpleModePlayerEntity id: $id, name: $name, isAlive: $isAlive, hasPosition: $hasPositioned, hasThrowBomb: $hasThrowBomb, isDisconnected: $isDisconnected, x: $x, y: $y';
+    return 'SimpleModePlayerEntity id: $id, name: $name, isAlive: $isAlive, hasPosition: $hasPositioned, hasThrowBomb: $hasThrowBomb, isDisconnected: $isDisconnected, x: $x, y: $y, throwOrder: $throwOrder';
   }
 }

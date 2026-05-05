@@ -168,7 +168,10 @@ class SimpleModeSocketHandler {
       final dataModel = PlayerReadyModel.fromJson(getData(data as Map<String, dynamic>));
 
       eventBus.fire(
-        PlayerReadyEvent(playerId: dataModel.playerId),
+        PlayerReadyEvent(
+          playerId: dataModel.playerId,
+          throwOrder: dataModel.throwOrder,
+        ),
       );
     } catch (e, stackTrace) {
       logger.e('onPlayerReady error.', error: e, stackTrace: stackTrace);

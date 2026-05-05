@@ -175,7 +175,7 @@ class SimpleModeController extends GetxController {
 
       setHoveredTile(null);
 
-      await GetIt.I<ThrowBombUseCase>().call(
+      final throwOrder = await GetIt.I<ThrowBombUseCase>().call(
         ThrowBombParams(
           roomCode: roomCode,
           x: x,
@@ -184,7 +184,10 @@ class SimpleModeController extends GetxController {
       );
       final index = playerList.indexWhere((e) => e.id == localPlayerId);
       if (index != 1) {
-        playerList[index] = playerList[index].copyWith(hasThrowBomb: true);
+        playerList[index] = playerList[index].copyWith(
+          hasThrowBomb: true,
+          throwOrder: throwOrder,
+        );
       }
       update([SimpleModeIds.playerListPanel]);
     } catch (e, stackTrace) {
@@ -228,7 +231,10 @@ class SimpleModeController extends GetxController {
       if (currentState == GameState.position) {
         playerList[index] = playerList[index].copyWith(hasPositioned: true);
       } else if (currentState == GameState.attack) {
-        playerList[index] = playerList[index].copyWith(hasThrowBomb: true);
+        playerList[index] = playerList[index].copyWith(
+          hasThrowBomb: true,
+          throwOrder: event.throwOrder,
+        );
       }
       update([SimpleModeIds.playerListPanel]);
     }
@@ -258,6 +264,7 @@ class SimpleModeController extends GetxController {
         playerList[i] = playerList[i].copyWith(
           hasThrowBomb: false,
           hasPositioned: true,
+          clearThrowOrder: true,
         );
       }
       update([SimpleModeIds.playerListPanel]);

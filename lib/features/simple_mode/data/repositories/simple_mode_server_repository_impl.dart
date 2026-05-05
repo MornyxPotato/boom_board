@@ -21,8 +21,8 @@ class SimpleModeServerRepositoryImpl implements SimpleModeServerRepository {
   }
 
   @override
-  Future<void> throwBomb(ThrowBombRequest request) async {
-    await socketService.throwBomb(request);
+  Future<ThrowBombResponse?> throwBomb(ThrowBombRequest request) async {
+    return await socketService.throwBomb(request);
   }
 
   @override

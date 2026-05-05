@@ -18,13 +18,15 @@ class ThrowBombUseCase {
 
   ThrowBombUseCase({required this.simpleModeServerRepository});
 
-  Future<void> call(ThrowBombParams params) async {
-    await simpleModeServerRepository.throwBomb(
+  Future<int?> call(ThrowBombParams params) async {
+    final res = await simpleModeServerRepository.throwBomb(
       ThrowBombRequest(
         roomCode: params.roomCode,
         x: params.x,
         y: params.y,
       ),
     );
+
+    return res?.throwOrder;
   }
 }
