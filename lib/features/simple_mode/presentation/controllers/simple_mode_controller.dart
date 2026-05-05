@@ -10,6 +10,7 @@ import 'package:boom_board/core/events/models/socket_disconnected_event.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_over_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_reset_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_started_event.dart';
@@ -62,6 +63,10 @@ class SimpleModeController extends GetxController {
   StreamSubscription? gameResetEventSubs;
   StreamSubscription? socketDisconnectedSubs;
   StreamSubscription? socketErrorSubs;
+
+  // --- ANIMATION STATE ---
+  // We store the coordinates of bombs currently falling
+  List<ActiveBombDropEntity> activeBombDrops = [];
 
   bool get isHost {
     return hostId == localPlayerId;
@@ -167,7 +172,7 @@ class SimpleModeController extends GetxController {
       );
       final index = playerList.indexWhere((e) => e.id == localPlayerId);
       if (index != 1) {
-        playerList[index] = playerList[index].copyWith(hasPositioned: true);
+        playerList[index] = playerList[index].copyWith(hasPositioned: true, x: x, y: y);
       }
       update([SimpleModeIds.playerListPanel]);
     } catch (e, stackTrace) {
@@ -292,11 +297,28 @@ class SimpleModeController extends GetxController {
     destroyedTile.addAll(event.destroyedTiles);
     update([SimpleModeIds.boardPanel]);
 
+    int? localPlayerX = localPlayer?.x;
+    int? localPlayerY = localPlayer?.y;
     // SEQUENTIAL EXPLOSION LOGIC
     // Even in a temporary UI, we use async/await inside a loop to process them one-by-one
     for (var explosion in event.explosionList) {
       // NOTE: When you build the real UI, this is where you trigger the
       // visual bomb explosion animation on the specific grid coordinates (explosion.x, explosion.y)
+
+      int startX = -1;
+      int startY = -1;
+
+      if (explosion.bomberId == localPlayerId) {
+        startX = localPlayerX ?? -1;
+        startY = localPlayerY ?? -1;
+      }
+      triggerBombAnimation(
+        explosion.bomberId,
+        startX,
+        startY,
+        explosion.x,
+        explosion.y,
+      );
 
       // Wait for the "animation" to finish before evaluating the result
       await Future.delayed(const Duration(seconds: 1));
@@ -313,6 +335,16 @@ class SimpleModeController extends GetxController {
 
     // Final Sync: Ensure our local list perfectly matches the server's master list
     playerList = event.playerList;
+    // Replacing the whole player list from server will delete our localPlayer x and y value.
+    // This is to put the x and y value back.
+    int index = playerList.indexWhere((e) => e.id == localPlayerId);
+    final currentPlayer = localPlayer;
+    if (index != -1 && currentPlayer != null) {
+      playerList[index] = currentPlayer.copyWith(
+        x: localPlayerX,
+        y: localPlayerY,
+      );
+    }
     actionLogList.addAll(event.newLogs);
 
     // We don't update state to 'attack' here, we wait for the server's PhaseChangedEvent
@@ -379,5 +411,27 @@ class SimpleModeController extends GetxController {
     showEndgameOverlay = !showEndgameOverlay;
     // We update both the board (to hide the overlay) and the control panel (to change the button text)
     update([SimpleModeIds.boardPanel, SimpleModeIds.controlPanel]);
+  }
+
+  // Helper to trigger the animation
+  void triggerBombAnimation(String bomberId, int startX, int startY, int targetX, int targetY) {
+    final drop = ActiveBombDropEntity(
+      id: DateTime.now().millisecondsSinceEpoch.toString() + bomberId,
+      bomberId: bomberId,
+      startX: startX,
+      startY: startY,
+      targetX: targetX,
+      targetY: targetY,
+    );
+
+    activeBombDrops.add(drop);
+    update([SimpleModeIds.boardPanel]);
+
+    // The animation takes 500ms. When it finishes, we remove the bomb!
+    // (This is exactly where we will trigger the "Kaboom" explosion next)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      activeBombDrops.removeWhere((b) => b.id == drop.id);
+      update([SimpleModeIds.boardPanel]);
+    });
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:boom_board/core/data/models/coordinate.dart';
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
 import 'package:boom_board/core/presentation/widgets/retro_dialog.dart';
@@ -6,6 +8,7 @@ import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
 import 'package:flutter/material.dart';
@@ -310,6 +313,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                     return Stack(
                       alignment: Alignment.center,
                       children: [
+                        // THE FLOOR / THE BOARD
                         GridView.builder(
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -394,6 +398,25 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                           },
                         ),
 
+                        // THE ANIMATION CANVAS
+                        SizedBox(
+                          width: tileSize * 8,
+                          height: tileSize * 8,
+                          // IgnorePointer ensures clicks pass through the animations to the grid below
+                          child: IgnorePointer(
+                            child: Stack(
+                              clipBehavior: Clip.none, // Allows bombs to start outside the box
+                              children: [
+                                // Loop through active bombs and draw them
+                                ...ctl.activeBombDrops.map(
+                                  (drop) => _buildBombAnimation(drop, tileSize, ctl.localPlayerId),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // THE CEILING
                         // This will only show up when currentState == GameState.end
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 150),
@@ -654,6 +677,59 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           ),
         ],
       ),
+    );
+  }
+
+  // --- BOMB DROP & THROW ANIMATION ---
+  Widget _buildBombAnimation(ActiveBombDropEntity drop, double tileSize, String localPlayerId) {
+    final targetPixelX = drop.targetX * tileSize;
+    final targetPixelY = drop.targetY * tileSize;
+
+    final startPixelX = drop.startX * tileSize;
+    final startPixelY = drop.startY * tileSize;
+
+    final isLocalPlayer = drop.bomberId == localPlayerId;
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(drop.id),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 500),
+      // Use easeIn for gravity drops, but easeOut looks better for throws!
+      curve: isLocalPlayer ? Curves.easeOutQuad : Curves.easeInCubic,
+      builder: (context, progress, child) {
+        double currentX;
+        double currentY;
+
+        if (isLocalPlayer || drop.startX != -1 || drop.startY != -1) {
+          // --- ARC THROW MATH (Local Player) ---
+          // 1. Calculate the straight line X and Y
+          currentX = startPixelX + ((targetPixelX - startPixelX) * progress);
+          double linearY = startPixelY + ((targetPixelY - startPixelY) * progress);
+
+          // 2. Add the Arc!
+          // math.sin creates a curve that peaks at 0.5 progress. We multiply by 100 pixels for height.
+          final arcHeight = 100.0;
+          currentY = linearY - (math.sin(progress * math.pi) * arcHeight);
+        } else {
+          // --- SKY DROP MATH (Other Players) ---
+          currentX = targetPixelX; // Locked to the target column
+
+          // Fall from 150 pixels above the board
+          final skyStartY = -150.0;
+          currentY = skyStartY + ((targetPixelY - skyStartY) * progress);
+        }
+
+        return Positioned(
+          left: currentX,
+          top: currentY,
+          width: tileSize,
+          height: tileSize,
+          child: const Center(
+            // TODO Replace this with an Image.asset('assets/bomb.png') later!
+            child: Icon(Icons.sports_baseball, color: Colors.black, size: 40),
+          ),
+        );
+      },
     );
   }
 }
