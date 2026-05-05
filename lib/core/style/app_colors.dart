@@ -10,3 +10,4 @@ const Color retroGrey = Color(0xFF44475A); // UI Backgrounds / Grid Dark
 const Color retroGridLight = Color(0xFF6272A4); // Grid Light
 const Color retroPaleBlue = Color(0xFFC5CAE9);
 const Color retroOrange = Color(0xFFFFB86C);
+const Color retroLightGrey = Colors.grey;

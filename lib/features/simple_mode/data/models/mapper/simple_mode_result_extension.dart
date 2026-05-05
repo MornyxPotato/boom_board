@@ -5,8 +5,10 @@ extension SimpleModeResultModelExtension on SimpleModeResultModel {
   SimpleModeResultEntity toEntity() {
     return SimpleModeResultEntity(
       rank: rank,
+      id: id,
       name: name,
       isAlive: isAlive,
+      isDisconnected: isDisconnected,
     );
   }
 }
@@ -15,8 +17,10 @@ extension SimpleModeResultEntityExtension on SimpleModeResultEntity {
   SimpleModeResultModel toModel() {
     return SimpleModeResultModel(
       rank: rank,
+      id: id,
       name: name,
       isAlive: isAlive,
+      isDisconnected: isDisconnected,
     );
   }
 }

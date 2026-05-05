@@ -5,12 +5,14 @@ class RetroButton extends StatefulWidget {
   final String text;
   final VoidCallback onPressed;
   final Color color;
+  final Color? textColor;
 
   const RetroButton({
     super.key,
     required this.text,
     required this.onPressed,
     this.color = retroPaleBlue,
+    this.textColor,
   });
 
   @override
@@ -60,8 +62,8 @@ class _RetroButtonState extends State<RetroButton> {
           child: Text(
             widget.text,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.black,
+            style: TextStyle(
+              color: widget.textColor ?? Colors.black,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),

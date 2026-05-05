@@ -124,7 +124,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                             if (ctl.isHost)
                               RetroButton(
                                 text: 'Play again',
-                                color: retroCyan,
+                                color: retroGreen,
                                 onPressed: controller.backToLobby,
                               )
                             else
@@ -137,6 +137,14 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                 ),
                               ),
                             if (ctl.isHost) const SizedBox(height: 4),
+                            const SizedBox(height: 8),
+                            RetroButton(
+                              text: ctl.showEndgameOverlay ? 'HIDE RESULTS' : 'SHOW RESULTS',
+                              color: retroBackground, // Makes it look like an outlined secondary button
+                              onPressed: controller.toggleEndgameOverlay,
+                              textColor: retroLightGrey,
+                            ),
+                            const SizedBox(height: 4),
                           ],
                         ],
                       );
@@ -299,88 +307,100 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                     final isPositionPhase = ctl.currentState == GameState.position;
                     final isAttackPhase = ctl.currentState == GameState.attack;
 
-                    return GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 8,
-                      ),
-                      itemCount: 64,
-                      itemBuilder: (context, index) {
-                        final x = index % 8;
-                        final y = index ~/ 8;
-                        final isDark = (x + y) % 2 == 1;
-
-                        // Check tile states
-                        final isDestroyed = ctl.destroyedTile.any((t) => t.x == x && t.y == y);
-                        final isHovered = ctl.hoveredTile?.x == x && ctl.hoveredTile?.y == y;
-
-                        // Check if the local player is allowed to interact with this tile right now
-                        bool canInteract = false;
-                        if (!isDestroyed && localPlayer != null && localPlayer.isAlive) {
-                          if (isPositionPhase && !localPlayer.hasPositioned) canInteract = true;
-                          if (isAttackPhase && !localPlayer.hasThrowBomb) canInteract = true;
-                        }
-
-                        // Determine the cursor
-                        SystemMouseCursor cursor = SystemMouseCursors.basic;
-                        if (isDestroyed) {
-                          cursor = SystemMouseCursors.forbidden; // Red circle with a slash
-                        } else if (canInteract) {
-                          cursor = SystemMouseCursors.click; // Pointing finger
-                        }
-
-                        return MouseRegion(
-                          cursor: cursor,
-                          onEnter: (_) {
-                            if (canInteract) ctl.setHoveredTile(Coordinate(x: x, y: y));
-                          },
-                          onExit: (_) {
-                            if (canInteract) ctl.setHoveredTile(null);
-                          },
-                          child: GestureDetector(
-                            onTap: () {
-                              if (!canInteract) return;
-                              if (isPositionPhase) ctl.setPosition(x, y);
-                              if (isAttackPhase) ctl.throwBomb(x, y);
-                            },
-                            child: Container(
-                              color: isDark ? retroGrey : retroGridLight,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // --- DESTROYED TILE EFFECT (Laser fire) ---
-                                  if (isDestroyed)
-                                    Container(
-                                      color: Colors.orange.withAlpha(
-                                        128,
-                                      ), // TODO replace this with fire animation gif
-                                      child: const Center(
-                                        child: Icon(Icons.local_fire_department, color: retroRed, size: 32),
-                                      ),
-                                    ),
-
-                                  // --- HOVER EFFECTS ---
-                                  if (isHovered && canInteract)
-                                    if (isPositionPhase)
-                                      // Ghost Character (position Phase)
-                                      const Icon(
-                                        Icons.android, // TODO replace this with player character
-                                        color: retroCyan,
-                                        size: 40,
-                                      )
-                                    else if (isAttackPhase)
-                                      // Target reticle (Bomb Phase)
-                                      const Icon(
-                                        Icons.gps_fixed, // Target reticle icon
-                                        color: retroRed,
-                                        size: 40,
-                                      ),
-                                ],
-                              ),
-                            ),
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 8,
                           ),
-                        );
-                      },
+                          itemCount: 64,
+                          itemBuilder: (context, index) {
+                            final x = index % 8;
+                            final y = index ~/ 8;
+                            final isDark = (x + y) % 2 == 1;
+
+                            // Check tile states
+                            final isDestroyed = ctl.destroyedTile.any((t) => t.x == x && t.y == y);
+                            final isHovered = ctl.hoveredTile?.x == x && ctl.hoveredTile?.y == y;
+
+                            // Check if the local player is allowed to interact with this tile right now
+                            bool canInteract = false;
+                            if (!isDestroyed && localPlayer != null && localPlayer.isAlive) {
+                              if (isPositionPhase && !localPlayer.hasPositioned) canInteract = true;
+                              if (isAttackPhase && !localPlayer.hasThrowBomb) canInteract = true;
+                            }
+
+                            // Determine the cursor
+                            SystemMouseCursor cursor = SystemMouseCursors.basic;
+                            if (isDestroyed) {
+                              cursor = SystemMouseCursors.forbidden; // Red circle with a slash
+                            } else if (canInteract) {
+                              cursor = SystemMouseCursors.click; // Pointing finger
+                            }
+
+                            return MouseRegion(
+                              cursor: cursor,
+                              onEnter: (_) {
+                                if (canInteract) ctl.setHoveredTile(Coordinate(x: x, y: y));
+                              },
+                              onExit: (_) {
+                                if (canInteract) ctl.setHoveredTile(null);
+                              },
+                              child: GestureDetector(
+                                onTap: () {
+                                  if (!canInteract) return;
+                                  if (isPositionPhase) ctl.setPosition(x, y);
+                                  if (isAttackPhase) ctl.throwBomb(x, y);
+                                },
+                                child: Container(
+                                  color: isDark ? retroGrey : retroGridLight,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // --- DESTROYED TILE EFFECT (Laser fire) ---
+                                      if (isDestroyed)
+                                        Container(
+                                          color: Colors.orange.withAlpha(
+                                            128,
+                                          ), // TODO replace this with fire animation gif
+                                          child: const Center(
+                                            child: Icon(Icons.local_fire_department, color: retroRed, size: 32),
+                                          ),
+                                        ),
+
+                                      // --- HOVER EFFECTS ---
+                                      if (isHovered && canInteract)
+                                        if (isPositionPhase)
+                                          // Ghost Character (position Phase)
+                                          const Icon(
+                                            Icons.android, // TODO replace this with player character
+                                            color: retroCyan,
+                                            size: 40,
+                                          )
+                                        else if (isAttackPhase)
+                                          // Target reticle (Bomb Phase)
+                                          const Icon(
+                                            Icons.gps_fixed, // Target reticle icon
+                                            color: retroRed,
+                                            size: 40,
+                                          ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // This will only show up when currentState == GameState.end
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 150),
+                          transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                          child: _buildEndgameOverlay(ctl),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -537,6 +557,102 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
             ...messageSpans, // Unpack the array of spans directly into the text!
           ],
         ),
+      ),
+    );
+  }
+
+  // --- ENDGAME SCOREBOARD OVERLAY ---
+  Widget _buildEndgameOverlay(SimpleModeController ctl) {
+    if (ctl.currentState != GameState.end || !ctl.showEndgameOverlay) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      // Constrain the height so it doesn't break on small screens
+      constraints: BoxConstraints(
+        maxHeight: Get.height * 0.8, // Takes up a max of 80% of the screen height
+        maxWidth: 600, // Prevents it from stretching too wide on massive monitors
+      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: retroBackground,
+        border: Border.all(color: retroYellow, width: 4),
+        boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(8, 8))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'GAME ENDED',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: retroYellow,
+              fontSize: 32,
+              shadows: [Shadow(color: Colors.black, offset: Offset(4, 4))],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // 3. Make the player list scrollable!
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: ctl.finalRanking.map((player) {
+                  final isWinner = player.rank == 1;
+
+                  // Color logic: Grey if DC, Green if Alive, Red if Dead
+                  final textColor = player.isDisconnected ? Colors.grey : (player.isAlive ? retroGreen : retroRed);
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '#${player.rank} ',
+                          style: const TextStyle(color: Colors.white, fontSize: 24),
+                        ),
+                        Flexible(
+                          child: Text(
+                            player.name,
+                            style: TextStyle(color: textColor, fontSize: 24),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+
+                        // 4. Added the [DC] logic check
+                        if (player.isDisconnected)
+                          const Text(
+                            ' [DC]',
+                            style: TextStyle(color: Colors.grey, fontSize: 24),
+                          )
+                        else if (isWinner)
+                          const Text(
+                            ' [WINNER]',
+                            style: TextStyle(color: retroYellow, fontSize: 24),
+                          )
+                        else if (!player.isAlive)
+                          const Text(
+                            ' [KIA]',
+                            style: TextStyle(color: Colors.grey, fontSize: 24),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+          RetroButton(
+            text: 'Close',
+            color: retroRed,
+            onPressed: controller.toggleEndgameOverlay,
+          ),
+        ],
       ),
     );
   }

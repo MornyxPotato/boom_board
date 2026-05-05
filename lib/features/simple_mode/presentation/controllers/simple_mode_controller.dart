@@ -20,6 +20,7 @@ import 'package:boom_board/features/simple_mode/domain/entities/events/player_le
 import 'package:boom_board/features/simple_mode/domain/entities/events/player_ready_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/round_resolved_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_result_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/use_cases/reset_game_use_case.dart';
 import 'package:boom_board/features/simple_mode/domain/use_cases/set_position_use_case.dart';
 import 'package:boom_board/features/simple_mode/domain/use_cases/start_game_use_case.dart';
@@ -46,6 +47,8 @@ class SimpleModeController extends GetxController {
   List<ActionLogEntity> actionLogList = [];
   List<Coordinate> destroyedTile = [];
   Coordinate? hoveredTile;
+  bool showEndgameOverlay = true;
+  List<SimpleModeResultEntity> finalRanking = [];
 
   final ScrollController logScrollController = ScrollController();
   StreamSubscription? playerJoinEventSubs;
@@ -133,6 +136,8 @@ class SimpleModeController extends GetxController {
   void resetRound() {
     actionLogList = [];
     destroyedTile = [];
+    finalRanking = [];
+    showEndgameOverlay = true;
     currentState = GameState.lobby;
   }
 
@@ -319,7 +324,10 @@ class SimpleModeController extends GetxController {
   void onGameOverEventReceived(GameOverEvent event) {
     logger.d('onGameOverEventReceived called with $event');
     currentState = GameState.end;
-    update([SimpleModeIds.controlPanel]);
+    finalRanking = event.ranking;
+    showEndgameOverlay = true;
+
+    update([SimpleModeIds.controlPanel, SimpleModeIds.boardPanel]);
   }
 
   void onGameResetEventReceived(GameResetEvent event) {
@@ -365,5 +373,11 @@ class SimpleModeController extends GetxController {
         );
       }
     });
+  }
+
+  void toggleEndgameOverlay() {
+    showEndgameOverlay = !showEndgameOverlay;
+    // We update both the board (to hide the overlay) and the control panel (to change the button text)
+    update([SimpleModeIds.boardPanel, SimpleModeIds.controlPanel]);
   }
 }
