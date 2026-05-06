@@ -7,8 +7,10 @@ import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type.dart';
+import 'package:boom_board/features/simple_mode/domain/constants/animation_constant.dart' as anim_constant;
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
 import 'package:flutter/material.dart';
@@ -407,9 +409,24 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                             child: Stack(
                               clipBehavior: Clip.none, // Allows bombs to start outside the box
                               children: [
-                                // Loop through active bombs and draw them
+                                // Orbital Lasers (ADD THIS HERE)
+                                ...ctl.activeLasers.map(
+                                  (anim) => _buildLaserAnimation(anim, tileSize),
+                                ),
+
+                                // Bombs falling/arcing
                                 ...ctl.activeBombDrops.map(
                                   (drop) => _buildBombAnimation(drop, tileSize, ctl.localPlayerId),
+                                ),
+
+                                // Explosions (Kaboom!)
+                                ...ctl.activeExplosions.map(
+                                  (anim) => _buildExplosionAnimation(anim, tileSize),
+                                ),
+
+                                // Ghosts floating away
+                                ...ctl.activeDeaths.map(
+                                  (anim) => _buildDeathAnimation(anim, tileSize),
                                 ),
                               ],
                             ),
@@ -693,7 +710,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
     return TweenAnimationBuilder<double>(
       key: ValueKey(drop.id),
       tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 500),
+      duration: anim_constant.bombDrop,
       // Use easeIn for gravity drops, but easeOut looks better for throws!
       curve: isLocalPlayer ? Curves.easeOutQuad : Curves.easeInCubic,
       builder: (context, progress, child) {
@@ -727,6 +744,104 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           child: const Center(
             // TODO Replace this with an Image.asset('assets/bomb.png') later!
             child: Icon(Icons.sports_baseball, color: Colors.black, size: 40),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- KABOOM EXPLOSION ANIMATION ---
+  Widget _buildExplosionAnimation(ActiveTileAnimationEntity anim, double tileSize) {
+    return Positioned(
+      key: ValueKey(anim.id),
+      left: anim.x * tileSize,
+      top: anim.y * tileSize,
+      width: tileSize,
+      height: tileSize,
+      child: Container(
+        color: retroYellow,
+        child: const Center(
+          child: Icon(Icons.flash_on, color: retroRed, size: 48),
+        ),
+      ),
+    );
+  }
+
+  // --- GHOST DEATH ANIMATION ---
+  Widget _buildDeathAnimation(ActiveTileAnimationEntity anim, double tileSize) {
+    final targetX = anim.x * tileSize;
+    final startY = anim.y * tileSize;
+    final targetY = startY - (tileSize * 1.5);
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(anim.id),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: anim_constant.deathGhost,
+      curve: Curves.easeOut,
+      builder: (context, progress, child) {
+        final currentY = startY - ((startY - targetY) * progress);
+        final currentOpacity = 1.0 - progress;
+
+        return Positioned(
+          left: targetX,
+          top: currentY,
+          width: tileSize,
+          height: tileSize,
+          child: Opacity(
+            opacity: currentOpacity,
+            child: const Center(
+              child: Icon(
+                // TODO update this with ghost / skull icon.
+                Icons.sentiment_very_dissatisfied,
+                color: Colors.white70,
+                size: 40,
+                shadows: [Shadow(color: retroRed, blurRadius: 10)],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- ORBITAL LASER ANIMATION ---
+  Widget _buildLaserAnimation(ActiveTileAnimationEntity anim, double tileSize) {
+    final targetX = anim.x * tileSize;
+
+    // The laser needs to reach from off-screen top all the way down to the bottom of the target tile
+    final targetBottomY = (anim.y + 1) * tileSize;
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(anim.id),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: anim_constant.laserBeam,
+      curve: Curves.easeOutExpo, // Slams down instantly, then lingers
+      builder: (context, progress, child) {
+        // The beam grows downwards extremely fast
+        final currentHeight = targetBottomY * (progress * 2).clamp(0.0, 1.0);
+
+        // After it hits the ground (progress > 0.5), it starts to fade away
+        final opacity = progress < 0.5 ? 1.0 : 1.0 - ((progress - 0.5) * 2);
+
+        return Positioned(
+          left: targetX,
+          top: -50, // Start slightly above the board
+          width: tileSize,
+          height: currentHeight + 50,
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              decoration: BoxDecoration(
+                // A harsh, bright cyan/white core with a glowing border
+                color: Colors.white,
+                border: Border.symmetric(
+                  vertical: BorderSide(color: retroCyan, width: 8),
+                ),
+                boxShadow: const [
+                  BoxShadow(color: retroCyan, blurRadius: 20, spreadRadius: 5),
+                ],
+              ),
+            ),
           ),
         );
       },

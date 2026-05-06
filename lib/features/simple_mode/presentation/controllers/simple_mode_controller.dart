@@ -9,8 +9,10 @@ import 'package:boom_board/core/events/models/socket_connected_error_event.dart'
 import 'package:boom_board/core/events/models/socket_disconnected_event.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
+import 'package:boom_board/features/simple_mode/domain/constants/animation_constant.dart' as anim_constant;
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_over_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_reset_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_started_event.dart';
@@ -67,6 +69,9 @@ class SimpleModeController extends GetxController {
   // --- ANIMATION STATE ---
   // We store the coordinates of bombs currently falling
   List<ActiveBombDropEntity> activeBombDrops = [];
+  List<ActiveTileAnimationEntity> activeExplosions = [];
+  List<ActiveTileAnimationEntity> activeDeaths = [];
+  List<ActiveTileAnimationEntity> activeLasers = [];
 
   bool get isHost {
     return hostId == localPlayerId;
@@ -293,10 +298,6 @@ class SimpleModeController extends GetxController {
     currentState = GameState.process;
     update([SimpleModeIds.controlPanel]);
 
-    // Add Orbital Laser damage immediately
-    destroyedTile.addAll(event.destroyedTiles);
-    update([SimpleModeIds.boardPanel]);
-
     int? localPlayerX = localPlayer?.x;
     int? localPlayerY = localPlayer?.y;
     // SEQUENTIAL EXPLOSION LOGIC
@@ -321,16 +322,35 @@ class SimpleModeController extends GetxController {
       );
 
       // Wait for the "animation" to finish before evaluating the result
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(anim_constant.bombDrop);
+
+      triggerExplosionEffect(explosion.x, explosion.y);
 
       if (explosion.isHit && explosion.victimId != null) {
         // Update the victim's status in real-time
-        final victimIndex = playerList.indexWhere((p) => p.name == explosion.victimId);
+        final victimIndex = playerList.indexWhere((p) => p.id == explosion.victimId);
         if (victimIndex != -1) {
           playerList[victimIndex] = playerList[victimIndex].copyWith(isAlive: false);
           update([SimpleModeIds.playerListPanel]);
+
+          triggerDeathAnimation(explosion.x, explosion.y);
         }
       }
+
+      await Future.delayed(anim_constant.explosionSettle);
+    }
+
+    // --- ORBITAL LASER PHASE ---
+    if (event.newDestroyedTiles.isNotEmpty) {
+      // Fire the animation!
+      triggerLaserAnimation(event.newDestroyedTiles);
+
+      // Wait for the beam to finish firing
+      await Future.delayed(anim_constant.destroyedTileDelay);
+
+      // Now permanently scorch the tiles so they stay on fire
+      destroyedTile = event.destroyedTiles;
+      update([SimpleModeIds.boardPanel]);
     }
 
     // Final Sync: Ensure our local list perfectly matches the server's master list
@@ -427,10 +447,47 @@ class SimpleModeController extends GetxController {
     activeBombDrops.add(drop);
     update([SimpleModeIds.boardPanel]);
 
-    // The animation takes 500ms. When it finishes, we remove the bomb!
-    // (This is exactly where we will trigger the "Kaboom" explosion next)
-    Future.delayed(const Duration(milliseconds: 500), () {
+    // Delay for the animation duration. When it finishes, we remove the bomb!
+    Future.delayed(anim_constant.bombDrop, () {
       activeBombDrops.removeWhere((b) => b.id == drop.id);
+      update([SimpleModeIds.boardPanel]);
+    });
+  }
+
+  void triggerExplosionEffect(int x, int y) {
+    final id = 'exp_${x}_${y}_${DateTime.now().millisecondsSinceEpoch}';
+    activeExplosions.add(ActiveTileAnimationEntity(id: id, x: x, y: y));
+    update([SimpleModeIds.boardPanel]);
+
+    // Delay for the animation duration. When it finishes, we remove the explosion!
+    Future.delayed(anim_constant.explosion, () {
+      activeExplosions.removeWhere((c) => c.x == x && c.y == y);
+      update([SimpleModeIds.boardPanel]);
+    });
+  }
+
+  void triggerDeathAnimation(int x, int y) {
+    final id = 'death_${x}_${y}_${DateTime.now().millisecondsSinceEpoch}';
+    activeDeaths.add(ActiveTileAnimationEntity(id: id, x: x, y: y));
+    update([SimpleModeIds.boardPanel]);
+
+    // Delay for the animation duration. When it finishes, we remove the ghost!
+    Future.delayed(anim_constant.deathGhost, () {
+      activeDeaths.removeWhere((c) => c.x == x && c.y == y);
+      update([SimpleModeIds.boardPanel]);
+    });
+  }
+
+  void triggerLaserAnimation(List<Coordinate> tiles) {
+    for (var tile in tiles) {
+      final id = 'laser_${tile.x}_${tile.y}_${DateTime.now().millisecondsSinceEpoch}';
+      activeLasers.add(ActiveTileAnimationEntity(id: id, x: tile.x, y: tile.y));
+    }
+    update([SimpleModeIds.boardPanel]);
+
+    // Delay for the animation duration. When it finishes, we remove the laser!
+    Future.delayed(anim_constant.laserBeam, () {
+      activeLasers.clear(); // Clear all lasers at once
       update([SimpleModeIds.boardPanel]);
     });
   }

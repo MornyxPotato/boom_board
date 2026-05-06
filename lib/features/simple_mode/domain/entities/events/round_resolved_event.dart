@@ -7,17 +7,19 @@ class RoundResolvedEvent {
   final List<ExplosionResultEntity> explosionList;
   final List<SimpleModePlayerEntity> playerList;
   final List<Coordinate> destroyedTiles;
+  final List<Coordinate> newDestroyedTiles;
   final List<ActionLogEntity> newLogs;
 
   RoundResolvedEvent({
     required this.explosionList,
     required this.playerList,
     required this.destroyedTiles,
+    required this.newDestroyedTiles,
     required this.newLogs,
   });
 
   @override
   String toString() {
-    return 'RoundResolvedEvent explosionList: $explosionList, playerList: $playerList, destroyedTiles: $destroyedTiles, newLogs: $newLogs';
+    return 'RoundResolvedEvent explosionList: $explosionList, playerList: $playerList, destroyedTiles: $destroyedTiles, newDestroyedTiles: $newDestroyedTiles, newLogs: $newLogs';
   }
 }

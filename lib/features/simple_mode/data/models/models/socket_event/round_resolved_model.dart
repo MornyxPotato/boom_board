@@ -7,12 +7,14 @@ class RoundResolvedModel {
   final List<ExplosionResultModel> explosionList;
   final List<PlayerModel> playerList;
   final List<Coordinate> destroyedTiles;
+  final List<Coordinate> newDestroyedTiles;
   final List<ActionLogModel> newLogs;
 
   RoundResolvedModel({
     required this.explosionList,
     required this.playerList,
     required this.destroyedTiles,
+    required this.newDestroyedTiles,
     required this.newLogs,
   });
 
@@ -32,6 +34,11 @@ class RoundResolvedModel {
       destroyedTiles.add(Coordinate.fromJson(coordinate));
     }
 
+    final List<Coordinate> newDestroyedTiles = [];
+    for (final coordinate in json['newDestroyedTiles']) {
+      newDestroyedTiles.add(Coordinate.fromJson(coordinate));
+    }
+
     final List<ActionLogModel> newLogs = [];
     for (final log in json['newLogs']) {
       newLogs.add(ActionLogModel.fromJson(log));
@@ -41,6 +48,7 @@ class RoundResolvedModel {
       explosionList: explosionList,
       playerList: playerList,
       destroyedTiles: destroyedTiles,
+      newDestroyedTiles: newDestroyedTiles,
       newLogs: newLogs,
     );
   }

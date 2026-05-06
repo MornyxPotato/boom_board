@@ -206,6 +206,7 @@ class SimpleModeSocketHandler {
           explosionList: dataModel.explosionList.map((e) => e.toEntity()).toList(),
           playerList: dataModel.playerList.toSimpleModeEntity(),
           destroyedTiles: dataModel.destroyedTiles,
+          newDestroyedTiles: dataModel.newDestroyedTiles,
           newLogs: dataModel.newLogs.map((e) => e.toEntity()).toList(),
         ),
       );
