@@ -10,6 +10,7 @@ import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type
 import 'package:boom_board/features/simple_mode/domain/constants/animation_constant.dart' as anim_constant;
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_hide_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
@@ -95,11 +96,21 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                     builder: (ctl) {
                       return Column(
                         children: [
-                          if (ctl.currentState != GameState.lobby && ctl.currentState != GameState.end)
+                          if (ctl.currentState != GameState.lobby &&
+                              ctl.currentState != GameState.end &&
+                              ctl.currentState != GameState.process)
                             Text(
-                              'PHASE:${ctl.currentState.toString().toUpperCase()}',
+                              ctl.getPhaseText(),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                              ),
+                            ),
+                          if (ctl.currentState == GameState.process)
+                            Center(
+                              child: RetroLoadingText(
+                                text: 'Loading',
                                 color: Colors.white,
                                 fontSize: 20,
                               ),
@@ -331,6 +342,8 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                             final isDestroyed = ctl.destroyedTile.any((t) => t.x == x && t.y == y);
                             final isHovered = ctl.hoveredTile?.x == x && ctl.hoveredTile?.y == y;
 
+                            final isLockedTarget = ctl.lockedBombTarget?.x == x && ctl.lockedBombTarget?.y == y;
+
                             // Check if the local player is allowed to interact with this tile right now
                             bool canInteract = false;
                             if (!isDestroyed && localPlayer != null && localPlayer.isAlive) {
@@ -376,6 +389,17 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                           ),
                                         ),
 
+                                      // --- LOCKED TARGET EFFECT ---
+                                      if (isLockedTarget)
+                                        const Opacity(
+                                          opacity: 0.5,
+                                          child: Icon(
+                                            Icons.gps_fixed,
+                                            color: retroRed,
+                                            size: 40,
+                                          ),
+                                        ),
+
                                       // --- HOVER EFFECTS ---
                                       if (isHovered && canInteract)
                                         if (isPositionPhase)
@@ -409,6 +433,14 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                             child: Stack(
                               clipBehavior: Clip.none, // Allows bombs to start outside the box
                               children: [
+                                // Static Local Player (Appears after their animation finishes)
+                                _buildStaticLocalPlayer(ctl, tileSize),
+
+                                // Stealth Hide Sequences (Local & Enemies)
+                                ...ctl.activeHideAnimations.map(
+                                  (anim) => _buildHideSequence(anim, tileSize),
+                                ),
+
                                 // Orbital Lasers (ADD THIS HERE)
                                 ...ctl.activeLasers.map(
                                   (anim) => _buildLaserAnimation(anim, tileSize),
@@ -841,6 +873,93 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                   BoxShadow(color: retroCyan, blurRadius: 20, spreadRadius: 5),
                 ],
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- 1. STATIC LOCAL AVATAR (Post-Animation) ---
+  Widget _buildStaticLocalPlayer(SimpleModeController ctl, double tileSize) {
+    final player = ctl.localPlayer;
+    if (player == null || !player.isAlive || player.x == null || player.y == null || !player.hasPositioned) {
+      return const SizedBox.shrink();
+    }
+
+    // Don't draw the static avatar if the animation is currently playing!
+    if (ctl.activeHideAnimations.any((a) => a.playerId == player.id)) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      left: player.x! * tileSize,
+      top: player.y! * tileSize,
+      width: tileSize,
+      height: tileSize,
+      child: const Opacity(
+        opacity: 0.5, // Stealth mode
+        child: Center(
+          child: Icon(
+            Icons.android,
+            color: retroCyan,
+            size: 40,
+            shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- 2. DYNAMIC HIDE SEQUENCE ---
+  Widget _buildHideSequence(ActiveHideAnimationEntity anim, double tileSize) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(anim.id),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: anim_constant.hideSequence, // 2.5 seconds total
+      curve: Curves.linear, // Robotic, arcade movement
+      builder: (context, progress, child) {
+        double currentX, currentY, currentOpacity;
+
+        // PHASE 1 (0.0 to 0.4 / First 1.0s): Walk from Off-screen to Edge
+        if (progress <= 0.4) {
+          final factor = progress / 0.4;
+          currentX = anim.startX + ((anim.edgeX - anim.startX) * factor);
+          currentY = anim.startY + ((anim.edgeY - anim.startY) * factor);
+          currentOpacity = 1.0; // Fully visible
+        }
+        // PHASE 2 (0.4 to 0.6 / Next 0.5s): Pause at Edge & Fade
+        else if (progress <= 0.6) {
+          final factor = (progress - 0.4) / 0.2;
+          currentX = anim.edgeX.toDouble();
+          currentY = anim.edgeY.toDouble();
+
+          // Local fades to 50%, Others fade to 0%
+          currentOpacity = anim.isLocal ? 1.0 - (0.5 * factor) : 1.0 - factor;
+        }
+        // PHASE 3 (0.6 to 1.0 / Final 1.0s): Walk to Target (Local) or vanish (Others)
+        else {
+          final factor = (progress - 0.6) / 0.4;
+          if (anim.isLocal && anim.targetX != null && anim.targetY != null) {
+            currentX = anim.edgeX + ((anim.targetX! - anim.edgeX) * factor);
+            currentY = anim.edgeY + ((anim.targetY! - anim.edgeY) * factor);
+            currentOpacity = 0.5;
+          } else {
+            currentX = anim.edgeX.toDouble();
+            currentY = anim.edgeY.toDouble();
+            currentOpacity = 0.0; // Completely hidden
+          }
+        }
+
+        return Positioned(
+          left: currentX * tileSize,
+          top: currentY * tileSize,
+          width: tileSize,
+          height: tileSize,
+          child: Opacity(
+            opacity: currentOpacity,
+            child: const Center(
+              child: Icon(Icons.android, color: retroCyan, size: 40),
             ),
           ),
         );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:boom_board/core/data/models/coordinate.dart';
 import 'package:boom_board/core/data/models/enums/game_mode.dart';
@@ -12,6 +13,7 @@ import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart
 import 'package:boom_board/features/simple_mode/domain/constants/animation_constant.dart' as anim_constant;
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/animation/active_hide_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_over_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_reset_event.dart';
@@ -50,6 +52,7 @@ class SimpleModeController extends GetxController {
   List<ActionLogEntity> actionLogList = [];
   List<Coordinate> destroyedTile = [];
   Coordinate? hoveredTile;
+  Coordinate? lockedBombTarget;
   bool showEndgameOverlay = true;
   List<SimpleModeResultEntity> finalRanking = [];
 
@@ -72,6 +75,7 @@ class SimpleModeController extends GetxController {
   List<ActiveTileAnimationEntity> activeExplosions = [];
   List<ActiveTileAnimationEntity> activeDeaths = [];
   List<ActiveTileAnimationEntity> activeLasers = [];
+  List<ActiveHideAnimationEntity> activeHideAnimations = [];
 
   bool get isHost {
     return hostId == localPlayerId;
@@ -149,6 +153,7 @@ class SimpleModeController extends GetxController {
     finalRanking = [];
     showEndgameOverlay = true;
     currentState = GameState.lobby;
+    lockedBombTarget = null;
   }
 
   void startGame() async {
@@ -164,6 +169,7 @@ class SimpleModeController extends GetxController {
   void setPosition(int x, int y) async {
     try {
       if (localPlayer?.hasPositioned == true) return;
+      if (x > 8 || y > 8 || x < 0 || y < 0) return;
 
       // Optimistic UI update: instantly hide the hover effect
       setHoveredTile(null);
@@ -176,10 +182,12 @@ class SimpleModeController extends GetxController {
         ),
       );
       final index = playerList.indexWhere((e) => e.id == localPlayerId);
-      if (index != 1) {
+      if (index != -1) {
         playerList[index] = playerList[index].copyWith(hasPositioned: true, x: x, y: y);
       }
-      update([SimpleModeIds.playerListPanel]);
+      update([SimpleModeIds.playerListPanel, SimpleModeIds.boardPanel]);
+
+      triggerHideAnimation(localPlayerId, true, targetX: x, targetY: y);
     } catch (e, stackTrace) {
       logger.e('setPosition error.', error: e, stackTrace: stackTrace);
     }
@@ -198,8 +206,9 @@ class SimpleModeController extends GetxController {
           y: y,
         ),
       );
+      lockedBombTarget = Coordinate(x: x, y: y);
       final index = playerList.indexWhere((e) => e.id == localPlayerId);
-      if (index != 1) {
+      if (index != -1) {
         playerList[index] = playerList[index].copyWith(
           hasThrowBomb: true,
           throwOrder: throwOrder,
@@ -227,6 +236,16 @@ class SimpleModeController extends GetxController {
     }
   }
 
+  String getPhaseText() {
+    if (currentState == GameState.position) {
+      return 'Phase:Hide';
+    } else if (currentState == GameState.attack) {
+      return 'Phase:Attack';
+    } else {
+      return '';
+    }
+  }
+
   void onPlayerJoinedEventReceived(PlayerJoinedEvent event) {
     logger.d('onPlayerJoinedEventReceived called with $event');
     playerList = event.playerList;
@@ -246,6 +265,10 @@ class SimpleModeController extends GetxController {
     if (index != -1) {
       if (currentState == GameState.position) {
         playerList[index] = playerList[index].copyWith(hasPositioned: true);
+
+        if (event.playerId != localPlayerId) {
+          triggerHideAnimation(event.playerId, false);
+        }
       } else if (currentState == GameState.attack) {
         playerList[index] = playerList[index].copyWith(
           hasThrowBomb: true,
@@ -279,11 +302,15 @@ class SimpleModeController extends GetxController {
 
     if (currentState == GameState.attack) {
       for (int i = 0; i < playerList.length; i++) {
+        bool shouldTriggerHideAnimation = playerList[i].hasPositioned == false && playerList[i].id != localPlayerId;
         playerList[i] = playerList[i].copyWith(
           hasThrowBomb: false,
           hasPositioned: true,
           clearThrowOrder: true,
         );
+        if (shouldTriggerHideAnimation) {
+          triggerHideAnimation(playerList[i].id, false);
+        }
       }
       update([SimpleModeIds.playerListPanel]);
     }
@@ -323,6 +350,10 @@ class SimpleModeController extends GetxController {
 
       // Wait for the "animation" to finish before evaluating the result
       await Future.delayed(anim_constant.bombDrop);
+
+      if (explosion.bomberId == localPlayerId) {
+        lockedBombTarget = null;
+      }
 
       triggerExplosionEffect(explosion.x, explosion.y);
 
@@ -378,6 +409,7 @@ class SimpleModeController extends GetxController {
     currentState = GameState.end;
     finalRanking = event.ranking;
     showEndgameOverlay = true;
+    lockedBombTarget = null;
 
     update([SimpleModeIds.controlPanel, SimpleModeIds.boardPanel]);
   }
@@ -488,6 +520,60 @@ class SimpleModeController extends GetxController {
     // Delay for the animation duration. When it finishes, we remove the laser!
     Future.delayed(anim_constant.laserBeam, () {
       activeLasers.clear(); // Clear all lasers at once
+      update([SimpleModeIds.boardPanel]);
+    });
+  }
+
+  void triggerHideAnimation(String playerId, bool isLocal, {int? targetX, int? targetY}) {
+    final random = math.Random();
+    final side = random.nextInt(4); // 0: Top, 1: Right, 2: Bottom, 3: Left
+
+    int startX, startY, edgeX, edgeY;
+    final randPos = random.nextInt(8); // Random position along the chosen side
+
+    if (side == 0) {
+      // Spawns Top
+      startX = randPos;
+      startY = -2;
+      edgeX = randPos;
+      edgeY = -1;
+    } else if (side == 1) {
+      // Spawns Right
+      startX = 9;
+      startY = randPos;
+      edgeX = 8;
+      edgeY = randPos;
+    } else if (side == 2) {
+      // Spawns Bottom
+      startX = randPos;
+      startY = 9;
+      edgeX = randPos;
+      edgeY = 8;
+    } else {
+      // Spawns Left
+      startX = -2;
+      startY = randPos;
+      edgeX = -1;
+      edgeY = randPos;
+    }
+
+    final anim = ActiveHideAnimationEntity(
+      id: 'hide_${playerId}_${DateTime.now().millisecondsSinceEpoch}',
+      playerId: playerId,
+      isLocal: isLocal,
+      startX: startX,
+      startY: startY,
+      edgeX: edgeX,
+      edgeY: edgeY,
+      targetX: targetX,
+      targetY: targetY,
+    );
+
+    activeHideAnimations.add(anim);
+    update([SimpleModeIds.boardPanel]);
+
+    Future.delayed(anim_constant.hideSequence, () {
+      activeHideAnimations.removeWhere((a) => a.id == anim.id);
       update([SimpleModeIds.boardPanel]);
     });
   }
