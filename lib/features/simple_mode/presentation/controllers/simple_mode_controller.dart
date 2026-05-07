@@ -157,6 +157,7 @@ class SimpleModeController extends GetxController {
   }
 
   void startGame() async {
+    if (playerList.length <= 1) return;
     if (isHost) {
       try {
         await GetIt.I<StartGameUseCase>().call(StartGameParams(roomCode: roomCode));
@@ -249,14 +250,14 @@ class SimpleModeController extends GetxController {
   void onPlayerJoinedEventReceived(PlayerJoinedEvent event) {
     logger.d('onPlayerJoinedEventReceived called with $event');
     playerList = event.playerList;
-    update([SimpleModeIds.playerListPanel]);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.controlPanel]);
   }
 
   void onPlayerLeftEventReceived(PlayerLeftEvent event) {
     logger.d('onPlayerLeftEventReceived called with $event');
     playerList = event.playerList;
     hostId = event.newHostId;
-    update([SimpleModeIds.playerListPanel]);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.controlPanel]);
   }
 
   void onPlayerReadyEventReceived(PlayerReadyEvent event) {

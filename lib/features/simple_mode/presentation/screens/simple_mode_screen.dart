@@ -119,9 +119,9 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                           if (ctl.currentState == GameState.lobby) ...[
                             if (ctl.isHost)
                               RetroButton(
-                                text: 'Start game',
+                                text: ctl.playerList.length > 1 ? 'Start game' : 'Need players',
                                 color: retroGreen,
-                                onPressed: controller.startGame,
+                                onPressed: ctl.playerList.length > 1 ? controller.startGame : null,
                               )
                             else
                               Padding(

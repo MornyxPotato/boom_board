@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class RetroButton extends StatefulWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final Color color;
   final Color? textColor;
 
@@ -23,39 +23,51 @@ class _RetroButtonState extends State<RetroButton> {
   bool _isPressed = false;
   bool _isHovered = false;
 
+  bool get _isDisabled => widget.onPressed == null;
+
   @override
   Widget build(BuildContext context) {
-    // Lighten the color slightly when hovered
-    final Color currentColor = _isHovered ? Color.lerp(widget.color, Colors.white, 0.5)! : widget.color;
+    // Visually dim the button if disabled, otherwise use the normal color
+    final baseColor = _isDisabled ? Colors.grey.shade800 : widget.color;
+
+    // Handle the hover color (only lighten if NOT disabled)
+    final displayColor = (_isHovered && !_isDisabled) ? baseColor.withAlpha(204) : baseColor;
+
+    // Handle the "pushed down" shadow effect (only push down if NOT disabled)
+    final double shadowOffset = (_isPressed && !_isDisabled) ? 0 : 6;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
+      // Change the cursor Normal arrow if disabled, Pointing hand if active.
+      cursor: _isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) {
-          setState(() => _isPressed = false);
-          widget.onPressed();
+        onTapDown: (_) {
+          if (!_isDisabled) setState(() => _isPressed = true);
         },
-        onTapCancel: () => setState(() => _isPressed = false),
+        onTapUp: (_) {
+          if (!_isDisabled) setState(() => _isPressed = false);
+        },
+        onTapCancel: () {
+          if (!_isDisabled) setState(() => _isPressed = false);
+        },
+        onTap: widget.onPressed,
         // Transform translates the button down and right when pressed
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 50),
-          transform: Matrix4.translationValues(
-            _isPressed ? 4.0 : 0.0,
-            _isPressed ? 4.0 : 0.0,
-            0.0,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          margin: EdgeInsets.only(top: 6 - shadowOffset, bottom: shadowOffset),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: currentColor,
-            border: Border.all(color: Colors.black, width: 4),
-            // The shadow disappears when pressed to create the illusion of depth
+            color: displayColor,
+            border: Border.all(
+              color: _isDisabled ? Colors.grey.shade600 : Colors.black,
+              width: 4,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black,
-                offset: _isPressed ? const Offset(0, 0) : const Offset(4, 4),
+                // The shadow shrinks when pressed to look like it's moving down
+                offset: Offset(shadowOffset, shadowOffset),
               ),
             ],
           ),
