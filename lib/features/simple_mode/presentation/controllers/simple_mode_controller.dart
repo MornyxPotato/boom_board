@@ -56,6 +56,8 @@ class SimpleModeController extends GetxController {
   Coordinate? lockedBombTarget;
   bool showEndgameOverlay = true;
   List<SimpleModeResultEntity> finalRanking = [];
+  int currentPhaseTimeLimit = 0;
+  String currentTimerKey = '';
 
   final ScrollController logScrollController = ScrollController();
   StreamSubscription? playerJoinEventSubs;
@@ -297,6 +299,7 @@ class SimpleModeController extends GetxController {
     currentState = event.state;
     destroyedTile = event.destroyedTiles;
     update([SimpleModeIds.controlPanel, SimpleModeIds.boardPanel]);
+    _startPhaseTimer(event.timeLimit);
   }
 
   void onPhaseChangedEventReceived(PhaseChangedEvent event) {
@@ -304,6 +307,7 @@ class SimpleModeController extends GetxController {
     currentState = event.state;
 
     if (currentState == GameState.attack) {
+      _startPhaseTimer(event.timeLimit);
       for (int i = 0; i < playerList.length; i++) {
         bool shouldTriggerHideAnimation = playerList[i].hasPositioned == false && playerList[i].id != localPlayerId;
         playerList[i] = playerList[i].copyWith(
@@ -326,6 +330,7 @@ class SimpleModeController extends GetxController {
 
     // Temporarily lock UI into a 'process' state so players can't click things
     currentState = GameState.process;
+    _clearPhaseTimer();
     update([SimpleModeIds.controlPanel]);
 
     int? localPlayerX = localPlayer?.x;
@@ -414,6 +419,7 @@ class SimpleModeController extends GetxController {
     showEndgameOverlay = true;
     lockedBombTarget = null;
 
+    _clearPhaseTimer();
     update([SimpleModeIds.controlPanel, SimpleModeIds.boardPanel]);
   }
 
@@ -579,5 +585,15 @@ class SimpleModeController extends GetxController {
       activeHideAnimations.removeWhere((a) => a.id == anim.id);
       update([SimpleModeIds.boardPanel]);
     });
+  }
+
+  void _startPhaseTimer(int seconds) {
+    currentPhaseTimeLimit = seconds;
+    currentTimerKey = 'timer_${currentState}_${DateTime.now().millisecondsSinceEpoch}';
+    update([SimpleModeIds.controlPanel]);
+  }
+
+  void _clearPhaseTimer() {
+    currentPhaseTimeLimit = -1;
   }
 }

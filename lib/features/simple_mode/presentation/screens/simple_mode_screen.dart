@@ -123,6 +123,9 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                               ),
                               textAlign: TextAlign.center,
                             ),
+                          // TIMER COUNTDOWN (Only in active phases)
+                          if (ctl.currentState == GameState.position || ctl.currentState == GameState.attack)
+                            _buildTimerBar(ctl),
                           if (ctl.currentState == GameState.process)
                             Center(
                               child: RetroLoadingText(
@@ -895,7 +898,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
     );
   }
 
-  // --- 1. STATIC LOCAL AVATAR (Post-Animation) ---
+  // --- STATIC LOCAL AVATAR (Post-Animation) ---
   Widget _buildStaticLocalPlayer(SimpleModeController ctl, double tileSize) {
     final player = ctl.localPlayer;
     if (player == null || !player.isAlive || player.x == null || player.y == null || !player.hasPositioned) {
@@ -926,7 +929,7 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
     );
   }
 
-  // --- 2. DYNAMIC HIDE SEQUENCE ---
+  // --- DYNAMIC HIDE SEQUENCE ---
   Widget _buildHideSequence(ActiveHideAnimationEntity anim, double tileSize) {
     return TweenAnimationBuilder<double>(
       key: ValueKey(anim.id),
@@ -979,6 +982,53 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           ),
         );
       },
+    );
+  }
+
+  // --- RETRO TIMER BAR ---
+  Widget _buildTimerBar(SimpleModeController ctl) {
+    // Hide the timer if we are in a phase with no time limit
+    if (ctl.currentPhaseTimeLimit <= 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 16, right: 16),
+      child: Row(
+        children: [
+          const Icon(Icons.access_time, color: Colors.white, size: 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              alignment: Alignment.centerLeft,
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey(ctl.currentTimerKey), // Restarts when the phase changes
+                tween: Tween<double>(begin: 1.0, end: 0.0),
+                duration: Duration(seconds: ctl.currentPhaseTimeLimit),
+                builder: (context, progress, child) {
+                  // Dynamic Color: Green -> Yellow (at 50%) -> Red (at 20%)
+                  Color barColor = retroGreen;
+                  if (progress < 0.2) {
+                    barColor = retroRed;
+                  } else if (progress < 0.5) {
+                    barColor = retroYellow;
+                  }
+
+                  return FractionallySizedBox(
+                    widthFactor: progress, // This does the shrinking math for us!
+                    child: Container(
+                      color: barColor,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
