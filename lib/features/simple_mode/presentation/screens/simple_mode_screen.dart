@@ -99,13 +99,29 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                           if (ctl.currentState != GameState.lobby &&
                               ctl.currentState != GameState.end &&
                               ctl.currentState != GameState.process)
-                            Text(
-                              ctl.getPhaseText(),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  // Only show the Round count if the game is actually running
+                                  if (ctl.currentState != GameState.lobby && ctl.currentState != GameState.end)
+                                    TextSpan(
+                                      text: 'ROUND ${ctl.currentRound}\n',
+                                      style: const TextStyle(
+                                        color: retroYellow, // Make the round pop!
+                                        fontSize: 24,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  TextSpan(
+                                    text: ctl.getPhaseText(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           if (ctl.currentState == GameState.process)
                             Center(
@@ -132,7 +148,6 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                   fontSize: 20,
                                 ),
                               ),
-                            if (ctl.isHost) const SizedBox(height: 4),
                           ],
 
                           // ENDGAME CONTROLS (Play Again)

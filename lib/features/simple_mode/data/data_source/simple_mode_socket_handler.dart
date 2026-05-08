@@ -208,6 +208,7 @@ class SimpleModeSocketHandler {
           destroyedTiles: dataModel.destroyedTiles,
           newDestroyedTiles: dataModel.newDestroyedTiles,
           newLogs: dataModel.newLogs.map((e) => e.toEntity()).toList(),
+          roundNumber: dataModel.roundNumber,
         ),
       );
     } catch (e, stackTrace) {

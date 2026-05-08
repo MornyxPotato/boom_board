@@ -48,6 +48,7 @@ class SimpleModeController extends GetxController {
   String roomCode = '';
   String hostId = '';
   GameState currentState = GameState.lobby;
+  int currentRound = 1;
   List<SimpleModePlayerEntity> playerList = [];
   List<ActionLogEntity> actionLogList = [];
   List<Coordinate> destroyedTile = [];
@@ -154,6 +155,7 @@ class SimpleModeController extends GetxController {
     showEndgameOverlay = true;
     currentState = GameState.lobby;
     lockedBombTarget = null;
+    currentRound = 1;
   }
 
   void startGame() async {
@@ -399,8 +401,8 @@ class SimpleModeController extends GetxController {
     }
     actionLogList.addAll(event.newLogs);
 
-    // We don't update state to 'attack' here, we wait for the server's PhaseChangedEvent
-    update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel]);
+    currentRound = event.roundNumber;
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel, SimpleModeIds.controlPanel]);
 
     _scrollToBottom();
   }

@@ -9,6 +9,7 @@ class RoundResolvedModel {
   final List<Coordinate> destroyedTiles;
   final List<Coordinate> newDestroyedTiles;
   final List<ActionLogModel> newLogs;
+  final int roundNumber;
 
   RoundResolvedModel({
     required this.explosionList,
@@ -16,6 +17,7 @@ class RoundResolvedModel {
     required this.destroyedTiles,
     required this.newDestroyedTiles,
     required this.newLogs,
+    required this.roundNumber,
   });
 
   static RoundResolvedModel fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class RoundResolvedModel {
       destroyedTiles: destroyedTiles,
       newDestroyedTiles: newDestroyedTiles,
       newLogs: newLogs,
+      roundNumber: json['roundNumber'],
     );
   }
 }
