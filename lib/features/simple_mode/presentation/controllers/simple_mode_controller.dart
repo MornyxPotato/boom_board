@@ -172,6 +172,7 @@ class SimpleModeController extends GetxController {
   }
 
   void setPosition(int x, int y) async {
+    SimpleModePlayerEntity? rollbackPlayerData;
     try {
       if (localPlayer?.hasPositioned == true) return;
       if (x > 8 || y > 8 || x < 0 || y < 0) return;
@@ -179,6 +180,11 @@ class SimpleModeController extends GetxController {
       // Optimistic UI update: instantly hide the hover effect
       setHoveredTile(null);
 
+      final index = playerList.indexWhere((e) => e.id == localPlayerId);
+      if (index != -1) {
+        rollbackPlayerData = playerList[index].copyWith();
+        playerList[index] = playerList[index].copyWith(hasPositioned: true, x: x, y: y);
+      }
       await GetIt.I<SetPositionUseCase>().call(
         SetPositionParams(
           roomCode: roomCode,
@@ -186,15 +192,16 @@ class SimpleModeController extends GetxController {
           y: y,
         ),
       );
-      final index = playerList.indexWhere((e) => e.id == localPlayerId);
-      if (index != -1) {
-        playerList[index] = playerList[index].copyWith(hasPositioned: true, x: x, y: y);
-      }
+
       update([SimpleModeIds.playerListPanel, SimpleModeIds.boardPanel]);
 
       triggerHideAnimation(localPlayerId, true, targetX: x, targetY: y);
     } catch (e, stackTrace) {
       logger.e('setPosition error.', error: e, stackTrace: stackTrace);
+      final index = playerList.indexWhere((e) => e.id == localPlayerId);
+      if (index != -1 && rollbackPlayerData != null) {
+        playerList[index] = rollbackPlayerData;
+      }
     }
   }
 
