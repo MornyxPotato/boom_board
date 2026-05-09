@@ -46,6 +46,7 @@ abstract class SimpleModeIds {
 }
 
 class SimpleModeController extends GetxController {
+  dynamic args;
   String roomCode = '';
   String hostId = '';
   GameState currentState = GameState.lobby;
@@ -102,14 +103,16 @@ class SimpleModeController extends GetxController {
     return GetIt.I<Logger>();
   }
 
+  SimpleModeController({required this.args});
+
   @override
   void onInit() {
     super.onInit();
-    if (Get.arguments is! SimpleModeArguments) {
+    if (this.args is! SimpleModeArguments) {
       Get.offAllNamed(home);
       return;
     }
-    final args = Get.arguments as SimpleModeArguments;
+    final args = this.args as SimpleModeArguments;
     roomCode = args.roomCode;
     hostId = args.hostId;
     playerList = args.playerList;
@@ -178,6 +181,7 @@ class SimpleModeController extends GetxController {
   void setPosition(int x, int y) async {
     SimpleModePlayerEntity? rollbackPlayerData;
     try {
+      if (localPlayer == null) return;
       if (localPlayer?.hasPositioned == true) return;
       if (x > 8 || y > 8 || x < 0 || y < 0) return;
 

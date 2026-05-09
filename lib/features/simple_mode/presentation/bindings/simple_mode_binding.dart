@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 class SimpleModeBinding extends Bindings {
   @override
   void dependencies() {
-    Get.put<SimpleModeController>(SimpleModeController());
+    final args = Get.arguments;
+    Get.put<SimpleModeController>(SimpleModeController(args: args));
   }
 }
