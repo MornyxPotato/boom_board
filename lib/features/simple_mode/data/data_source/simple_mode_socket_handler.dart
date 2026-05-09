@@ -5,6 +5,7 @@ import 'package:boom_board/features/simple_mode/data/models/mapper/action_log_ma
 import 'package:boom_board/features/simple_mode/data/models/mapper/explosion_result_extension.dart';
 import 'package:boom_board/features/simple_mode/data/models/mapper/simple_mode_result_extension.dart';
 import 'package:boom_board/features/simple_mode/data/models/mapper/socket_event_data_mapper.dart';
+import 'package:boom_board/features/simple_mode/data/models/models/socket_event/forced_position_model.dart';
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/game_over_model.dart';
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/game_reset_model.dart';
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/game_started_model.dart';
@@ -14,6 +15,7 @@ import 'package:boom_board/features/simple_mode/data/models/models/socket_event/
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/player_left_model.dart';
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/player_ready_model.dart';
 import 'package:boom_board/features/simple_mode/data/models/models/socket_event/round_resolved_model.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/events/forced_position_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_over_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_reset_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_started_event.dart';
@@ -53,6 +55,8 @@ class SimpleModeSocketHandler {
     socketService.socket.on('gameOver', onGameOver);
 
     socketService.socket.on('gameReset', onGameReset);
+
+    socketService.socket.on('forcedPosition', onForcedPosition);
   }
 
   void dispose() {
@@ -73,6 +77,8 @@ class SimpleModeSocketHandler {
     socketService.socket.off('gameOver', onGameOver);
 
     socketService.socket.off('gameReset', onGameReset);
+
+    socketService.socket.off('forcedPosition', onForcedPosition);
   }
 
   void _validateSocketEventData(dynamic data) {
@@ -245,6 +251,22 @@ class SimpleModeSocketHandler {
       );
     } catch (e, stackTrace) {
       logger.e('onGameReset error.', error: e, stackTrace: stackTrace);
+    }
+  }
+
+  void onForcedPosition(dynamic data) async {
+    try {
+      _validateSocketEventData(data);
+
+      final dataModel = ForcedPositionModel.fromJson(getData(data as Map<String, dynamic>));
+
+      eventBus.fire(
+        ForcedPositionEvent(
+          position: dataModel.position,
+        ),
+      );
+    } catch (e, stackTrace) {
+      logger.e('onForcedPosition error.', error: e, stackTrace: stackTrace);
     }
   }
 }

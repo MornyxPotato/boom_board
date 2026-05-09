@@ -15,6 +15,7 @@ import 'package:boom_board/features/simple_mode/domain/entities/action_log_entit
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_hide_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/events/forced_position_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_over_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_reset_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/game_started_event.dart';
@@ -71,6 +72,7 @@ class SimpleModeController extends GetxController {
   StreamSubscription? gameResetEventSubs;
   StreamSubscription? socketDisconnectedSubs;
   StreamSubscription? socketErrorSubs;
+  StreamSubscription? forcedPositionSubs;
 
   // --- ANIMATION STATE ---
   // We store the coordinates of bombs currently falling
@@ -132,8 +134,9 @@ class SimpleModeController extends GetxController {
     roundResolvedEventSubs = eventBus.on<RoundResolvedEvent>().listen(onRoundResolvedEventReceived);
     gameOverEventSubs = eventBus.on<GameOverEvent>().listen(onGameOverEventReceived);
     gameResetEventSubs = eventBus.on<GameResetEvent>().listen(onGameResetEventReceived);
-    socketDisconnectedSubs = eventBus.on<SocketDisconnectedEvent>().listen(_onConnectionLost);
-    socketErrorSubs = eventBus.on<SocketConnectedErrorEvent>().listen(_onConnectionLost);
+    socketDisconnectedSubs = eventBus.on<SocketDisconnectedEvent>().listen(_onConnectionLostReceived);
+    socketErrorSubs = eventBus.on<SocketConnectedErrorEvent>().listen(_onConnectionLostReceived);
+    forcedPositionSubs = eventBus.on<ForcedPositionEvent>().listen(onForcedPositionReceived);
   }
 
   void unsubscribeListener() {
@@ -148,6 +151,7 @@ class SimpleModeController extends GetxController {
     gameResetEventSubs?.cancel();
     socketDisconnectedSubs?.cancel();
     socketErrorSubs?.cancel();
+    forcedPositionSubs?.cancel();
   }
 
   void resetRound() {
@@ -442,7 +446,25 @@ class SimpleModeController extends GetxController {
     ]);
   }
 
-  void _onConnectionLost(dynamic event) {
+  void onForcedPositionReceived(ForcedPositionEvent event) {
+    logger.d('onForcedPositionReceived called with $event');
+    int index = playerList.indexWhere((e) => e.id == localPlayerId);
+    if (index != -1) {
+      playerList[index] = playerList[index].copyWith(
+        hasPositioned: true,
+        x: event.position.x,
+        y: event.position.y,
+      );
+      triggerHideAnimation(
+        playerList[index].id,
+        true,
+        targetX: event.position.x,
+        targetY: event.position.y,
+      );
+    }
+  }
+
+  void _onConnectionLostReceived(dynamic event) {
     logger.e('Socket disconnected! Navigating back to home screen.');
     Get.offAllNamed(home);
 
