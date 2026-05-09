@@ -4,6 +4,7 @@ import 'package:boom_board/core/data/models/coordinate.dart';
 import 'package:boom_board/core/presentation/widgets/retro_button.dart';
 import 'package:boom_board/core/presentation/widgets/retro_dialog.dart';
 import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
+import 'package:boom_board/core/presentation/widgets/sprite_animation.dart';
 import 'package:boom_board/core/style/app_colors.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type.dart';
@@ -14,6 +15,7 @@ import 'package:boom_board/features/simple_mode/domain/entities/animation/active
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_tile_animation_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/presentation/controllers/simple_mode_controller.dart';
+import 'package:boom_board/gen/assets.gen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -392,29 +394,27 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                   if (isAttackPhase) ctl.throwBomb(x, y);
                                 },
                                 child: Container(
-                                  color: isDark ? retroGrey : retroGridLight,
+                                  color: isDark ? boardDark : boardLight,
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
                                       // --- DESTROYED TILE EFFECT (Laser fire) ---
                                       if (isDestroyed)
-                                        Container(
-                                          color: Colors.orange.withAlpha(
-                                            128,
-                                          ), // TODO replace this with fire animation gif
-                                          child: const Center(
-                                            child: Icon(Icons.local_fire_department, color: retroRed, size: 32),
-                                          ),
+                                        SpriteAnimation(
+                                          imagePath: $AssetsImagesGen().fireSprite.path,
+                                          frameCount: 10,
+                                          duration: Duration(seconds: 1),
+                                          width: 60,
+                                          height: 60,
                                         ),
 
                                       // --- LOCKED TARGET EFFECT ---
                                       if (isLockedTarget)
-                                        const Opacity(
+                                        Opacity(
                                           opacity: 0.5,
-                                          child: Icon(
-                                            Icons.gps_fixed,
-                                            color: retroRed,
-                                            size: 40,
+                                          child: const $AssetsImagesGen().bombTarget.image(
+                                            width: 32,
+                                            height: 32,
                                           ),
                                         ),
 
@@ -422,17 +422,15 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                       if (isHovered && canInteract)
                                         if (isPositionPhase)
                                           // Ghost Character (position Phase)
-                                          const Icon(
-                                            Icons.android, // TODO replace this with player character
-                                            color: retroCyan,
-                                            size: 40,
+                                          const $AssetsImagesGen().robotBlue.image(
+                                            width: 32,
+                                            height: 32,
                                           )
                                         else if (isAttackPhase)
                                           // Target reticle (Bomb Phase)
-                                          const Icon(
-                                            Icons.gps_fixed, // Target reticle icon
-                                            color: retroRed,
-                                            size: 40,
+                                          const $AssetsImagesGen().bombTarget.image(
+                                            width: 32,
+                                            height: 32,
                                           ),
                                     ],
                                   ),
@@ -506,22 +504,31 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
   Widget _buildPlayerStatusIcon(SimpleModePlayerEntity player, GameState currentState) {
     // Highest Priority: Disconnected
     if (player.isDisconnected) {
-      // TODO Replace this with disconnect icon
-      return const Icon(Icons.power_off, color: Colors.grey, size: 24);
+      return const $AssetsImagesGen().disconnected.image(
+        width: 32,
+        height: 32,
+      );
     }
 
     // Second Priority: Dead
     if (!player.isAlive) {
-      // TODO Replace this with dead icon
-      return const Icon(Icons.close, color: retroRed, size: 28);
+      return const $AssetsImagesGen().deadIcon.image(
+        width: 32,
+        height: 32,
+      );
     }
 
     // Alive & Active Phases
     if (currentState == GameState.position) {
-      // TODO Replace this with ready / check mark icon
       return player.hasPositioned
-          ? const Icon(Icons.check_box, color: retroGreen, size: 24)
-          : const Icon(Icons.check_box_outline_blank, color: Colors.grey, size: 24);
+          ? const $AssetsImagesGen().readyIcon.image(
+              width: 32,
+              height: 32,
+            )
+          : const $AssetsImagesGen().notReadyIcon.image(
+              width: 32,
+              height: 32,
+            );
     }
 
     if (currentState == GameState.attack) {
@@ -546,8 +553,10 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           ),
         );
       } else {
-        // TODO Replace this with ready / check mark icon
-        return const Icon(Icons.gps_not_fixed, color: Colors.grey, size: 24);
+        return const $AssetsImagesGen().bombTarget.image(
+          width: 32,
+          height: 32,
+        );
       }
     }
 
@@ -791,9 +800,11 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           top: currentY,
           width: tileSize,
           height: tileSize,
-          child: const Center(
-            // TODO Replace this with an Image.asset('assets/bomb.png') later!
-            child: Icon(Icons.sports_baseball, color: Colors.black, size: 40),
+          child: Center(
+            child: const $AssetsImagesGen().bomb.image(
+              width: 32,
+              height: 32,
+            ),
           ),
         );
       },
@@ -808,11 +819,10 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
       top: anim.y * tileSize,
       width: tileSize,
       height: tileSize,
-      child: Container(
-        color: retroYellow,
-        child: const Center(
-          child: Icon(Icons.flash_on, color: retroRed, size: 48),
-        ),
+      child: const $AssetsImagesGen().explosion.image(
+        width: 60,
+        height: 60,
+        fit: BoxFit.fitWidth,
       ),
     );
   }
@@ -839,13 +849,10 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           height: tileSize,
           child: Opacity(
             opacity: currentOpacity,
-            child: const Center(
-              child: Icon(
-                // TODO update this with ghost / skull icon.
-                Icons.sentiment_very_dissatisfied,
-                color: Colors.white70,
-                size: 40,
-                shadows: [Shadow(color: retroRed, blurRadius: 10)],
+            child: Center(
+              child: const $AssetsImagesGen().deadIcon.image(
+                width: 32,
+                height: 32,
               ),
             ),
           ),
@@ -915,14 +922,12 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
       top: player.y! * tileSize,
       width: tileSize,
       height: tileSize,
-      child: const Opacity(
+      child: Opacity(
         opacity: 0.5, // Stealth mode
         child: Center(
-          child: Icon(
-            Icons.android,
-            color: retroCyan,
-            size: 40,
-            shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
+          child: const $AssetsImagesGen().robotBlue.image(
+            width: 32,
+            height: 32,
           ),
         ),
       ),
@@ -976,8 +981,11 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           height: tileSize,
           child: Opacity(
             opacity: currentOpacity,
-            child: const Center(
-              child: Icon(Icons.android, color: retroCyan, size: 40),
+            child: Center(
+              child: const $AssetsImagesGen().robotBlue.image(
+                width: 32,
+                height: 32,
+              ),
             ),
           ),
         );
@@ -994,7 +1002,10 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
       padding: const EdgeInsets.only(top: 4, left: 16, right: 16),
       child: Row(
         children: [
-          const Icon(Icons.access_time, color: Colors.white, size: 24),
+          const $AssetsImagesGen().clockIcon.image(
+            width: 32,
+            height: 32,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Container(

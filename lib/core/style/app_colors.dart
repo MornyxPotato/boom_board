@@ -11,3 +11,5 @@ const Color retroGridLight = Color(0xFF6272A4); // Grid Light
 const Color retroPaleBlue = Color(0xFFC5CAE9);
 const Color retroOrange = Color(0xFFFFB86C);
 const Color retroLightGrey = Colors.grey;
+const Color boardLight = Color(0xFF4B6E63);
+const Color boardDark = Color(0xFF3A564D);
