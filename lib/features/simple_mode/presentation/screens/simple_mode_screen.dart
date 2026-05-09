@@ -982,10 +982,15 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
           child: Opacity(
             opacity: currentOpacity,
             child: Center(
-              child: const $AssetsImagesGen().robotBlue.image(
-                width: 32,
-                height: 32,
-              ),
+              child: anim.isLocal
+                  ? const $AssetsImagesGen().robotBlue.image(
+                      width: 32,
+                      height: 32,
+                    )
+                  : const $AssetsImagesGen().robotRed.image(
+                      width: 32,
+                      height: 32,
+                    ),
             ),
           ),
         );
