@@ -1,0 +1,38 @@
+name: Deploy Boom Board to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ] # Triggers when you push to main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Create .env file
+        run: |
+          echo "YOUR_ENV_VARIABLE_NAME=${{ secrets.BACKEND_URL }}" > .env
+
+      - name: Build Web App
+        # Make sure the base-href exactly matches your repository name!
+        run: flutter build web --release --base-href "/boom_board/"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
