@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:boom_board/core/data/models/enums/game_mode.dart';
+import 'package:boom_board/core/domain/constants/home_animation_constant.dart';
+import 'package:boom_board/core/domain/entities/enums/home_animation_state.dart';
 import 'package:boom_board/core/domain/use_cases/connect_to_server_use_case.dart';
 import 'package:boom_board/core/domain/use_cases/create_room_use_case.dart';
 import 'package:boom_board/core/domain/use_cases/join_room_use_case.dart';
@@ -23,6 +26,8 @@ abstract class HomeIds {
   static const connectingIndicator = 'CONNECTING_INDICATOR';
   static const connectErrorText = 'CONNECT_ERROR_TEXT';
   static const panel = 'PANEL';
+  static const backgroundId = 'HOME_BACKGROUND';
+  static const tagline = 'TAGLINE';
 }
 
 class HomeController extends GetxController {
@@ -39,6 +44,16 @@ class HomeController extends GetxController {
   StreamSubscription? socketDisconnectedListener;
   StreamSubscription? socketReconnectAttemptedListener;
 
+  // Animation variable
+  HomeAnimationState currentState = HomeAnimationState.spawning;
+  AttackType currentAttackType = AttackType.arcThrow;
+  bool _isRunning = true;
+  // NORMALIZED COORDINATES (0.0 to 1.0) ---
+  double localX = 0.0;
+  double localY = 0.0;
+  double otherX = 0.0;
+  double otherY = 0.0;
+
   Logger get logger {
     return GetIt.I<Logger>();
   }
@@ -47,6 +62,8 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
 
+    _generateNewPositions();
+    _startAnimationLoop();
     subscribeEvent();
     try {
       isConnecting = true;
@@ -59,6 +76,7 @@ class HomeController extends GetxController {
   @override
   void onClose() {
     super.onClose();
+    _isRunning = false;
     socketConnectedListener?.cancel();
     socketConnectedErrorListener?.cancel();
     socketDisconnectedListener?.cancel();
@@ -216,5 +234,83 @@ class HomeController extends GetxController {
     playerNameTextFieldCtl.clear();
     roomCodeTextFieldCtl.clear();
     update([HomeIds.panel]);
+  }
+
+  // --- THE STATE MACHINE ---
+  void _startAnimationLoop() async {
+    // Wait a tiny bit on first load so it doesn't start instantly before the screen renders
+    await Future.delayed(HomeAnimationConstant.betweenLoopDelay);
+
+    while (_isRunning) {
+      // 1. Spawning
+      currentState = HomeAnimationState.spawning;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.spawn);
+      if (!_isRunning) break;
+
+      // 2. Repositioning (Walking/Fading)
+      moveLocalPlayerInward();
+      currentState = HomeAnimationState.repositioning;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.walk);
+      if (!_isRunning) break;
+
+      currentState = HomeAnimationState.waiting;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.betweenLoopDelay);
+      if (!_isRunning) break;
+
+      // 3. Attacking (Bomb in air)
+      currentState = HomeAnimationState.attacking;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.bombFlight); // Time it takes bomb to hit
+      if (!_isRunning) break;
+
+      // 4. Exploding
+      currentState = HomeAnimationState.exploding;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.explosion); // Time the explosion lasts
+      if (!_isRunning) break;
+
+      // 5. Celebrating (Victory sprite)
+      currentState = HomeAnimationState.celebrating;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.celebrate); // Let them flex for a bit
+      if (!_isRunning) break;
+
+      // 6. Resetting (Everything fades to black)
+      currentState = HomeAnimationState.resetting;
+      update([HomeIds.backgroundId, HomeIds.tagline]);
+      await Future.delayed(HomeAnimationConstant.reset);
+      if (!_isRunning) break;
+
+      // --- LOOP COMPLETE: Toggle the attack type for the next round! ---
+      // --- Calculate fresh positions for the next loop! ---
+      _generateNewPositions();
+      currentAttackType = currentAttackType == AttackType.arcThrow ? AttackType.verticalDrop : AttackType.arcThrow;
+      await Future.delayed(HomeAnimationConstant.betweenLoopDelay);
+    }
+  }
+
+  // --- THE MATH: SAFE ZONE CALCULATION ---
+  void _generateNewPositions() {
+    final random = math.Random();
+
+    // Local player spawns on the Left (between 5% and 15% of screen width)
+    localX = 0.05 + random.nextDouble() * 0.05;
+    // Y is anywhere in the middle 60% of the screen height
+    localY = 0.20 + random.nextDouble() * 0.60;
+
+    // Other player spawns on the Right (between 85% and 95% of screen width)
+    otherX = 0.85 + random.nextDouble() * 0.10;
+    otherY = 0.20 + random.nextDouble() * 0.60;
+  }
+
+  // Helper to move the local player slightly inward during the reposition phase
+  void moveLocalPlayerInward() {
+    final random = math.Random();
+    // Move to 20%-30% of the screen (still safely away from the center menu)
+    localX = 0.20 + random.nextDouble() * 0.10;
+    localY = localY + (random.nextDouble() * 0.10 - 0.05); // Slight Y shift
   }
 }

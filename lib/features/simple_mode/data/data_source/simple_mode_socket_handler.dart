@@ -231,6 +231,7 @@ class SimpleModeSocketHandler {
       eventBus.fire(
         GameOverEvent(
           ranking: dataModel.ranking.map((e) => e.toEntity()).toList(),
+          winnerPosition: dataModel.winnerPosition,
         ),
       );
     } catch (e, stackTrace) {

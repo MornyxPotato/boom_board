@@ -55,6 +55,7 @@ class SimpleModeController extends GetxController {
   List<Coordinate> destroyedTile = [];
   Coordinate? hoveredTile;
   Coordinate? lockedBombTarget;
+  Coordinate? winnerPosition;
   bool showEndgameOverlay = true;
   List<SimpleModeResultEntity> finalRanking = [];
   int currentPhaseTimeLimit = 0;
@@ -162,6 +163,7 @@ class SimpleModeController extends GetxController {
     currentState = GameState.lobby;
     lockedBombTarget = null;
     currentRound = 1;
+    winnerPosition = null;
   }
 
   void startGame() async {
@@ -427,6 +429,7 @@ class SimpleModeController extends GetxController {
     logger.d('onGameOverEventReceived called with $event');
     currentState = GameState.end;
     finalRanking = event.ranking;
+    winnerPosition = event.winnerPosition;
     showEndgameOverlay = true;
     lockedBombTarget = null;
 

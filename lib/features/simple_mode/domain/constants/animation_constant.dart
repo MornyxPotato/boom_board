@@ -7,3 +7,4 @@ const Duration explosion = Duration(milliseconds: 500); // How long the Kaboom f
 const Duration explosionSettle = Duration(milliseconds: 500); // Pause before next bomb
 const Duration deathGhost = Duration(milliseconds: 1500); // Ghost animation duration
 const Duration hideSequence = Duration(milliseconds: 2500);
+const Duration winnerFadeIn = Duration(milliseconds: 800);

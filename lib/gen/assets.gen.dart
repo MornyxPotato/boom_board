@@ -48,6 +48,14 @@ class $AssetsImagesGen {
   AssetGenImage get notReadyIcon =>
       const AssetGenImage('assets/images/not_ready_icon.png');
 
+  /// File path: assets/images/player_blue_win.png
+  AssetGenImage get playerBlueWin =>
+      const AssetGenImage('assets/images/player_blue_win.png');
+
+  /// File path: assets/images/player_red_win.png
+  AssetGenImage get playerRedWin =>
+      const AssetGenImage('assets/images/player_red_win.png');
+
   /// File path: assets/images/ready_icon.png
   AssetGenImage get readyIcon =>
       const AssetGenImage('assets/images/ready_icon.png');
@@ -71,6 +79,8 @@ class $AssetsImagesGen {
     fire,
     fireSprite,
     notReadyIcon,
+    playerBlueWin,
+    playerRedWin,
     readyIcon,
     robotBlue,
     robotRed,
