@@ -1,12 +1,17 @@
+import 'package:boom_board/core/data/models/coordinate.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_result_entity.dart';
 
 class GameOverEvent {
   final List<SimpleModeResultEntity> ranking;
+  final Coordinate winnerPosition;
 
-  GameOverEvent({required this.ranking});
+  GameOverEvent({
+    required this.ranking,
+    required this.winnerPosition,
+  });
 
   @override
   String toString() {
-    return 'GameOverEvent ranking: $ranking';
+    return 'GameOverEvent ranking: $ranking, winnerPosition: $winnerPosition';
   }
 }

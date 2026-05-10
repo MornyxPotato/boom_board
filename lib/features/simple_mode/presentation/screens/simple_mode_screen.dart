@@ -452,6 +452,8 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
                                 // Static Local Player (Appears after their animation finishes)
                                 _buildStaticLocalPlayer(ctl, tileSize),
 
+                                _buildWinnerPlayer(ctl, tileSize),
+
                                 // Stealth Hide Sequences (Local & Enemies)
                                 ...ctl.activeHideAnimations.map(
                                   (anim) => _buildHideSequence(anim, tileSize),
@@ -908,7 +910,12 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
   // --- STATIC LOCAL AVATAR (Post-Animation) ---
   Widget _buildStaticLocalPlayer(SimpleModeController ctl, double tileSize) {
     final player = ctl.localPlayer;
-    if (player == null || !player.isAlive || player.x == null || player.y == null || !player.hasPositioned) {
+    if (player == null ||
+        !player.isAlive ||
+        player.x == null ||
+        player.y == null ||
+        !player.hasPositioned ||
+        ctl.currentState == GameState.end) {
       return const SizedBox.shrink();
     }
 
@@ -1046,5 +1053,46 @@ class SimpleModeScreen extends GetView<SimpleModeController> {
         ],
       ),
     );
+  }
+
+  Widget _buildWinnerPlayer(SimpleModeController ctl, double tileSize) {
+    bool isLocalPlayerWin = ctl.localPlayer?.isAlive ?? false;
+    // Check if the winner position exists!
+    if (ctl.winnerPosition != null) {
+      return TweenAnimationBuilder<double>(
+        // The key ensures the animation plays exactly once when inserted
+        key: ValueKey('winner_${ctl.winnerPosition!.x}_${ctl.winnerPosition!.y}'),
+        tween: Tween<double>(
+          begin: isLocalPlayerWin ? 0.5 : 0.0,
+          end: 1.0,
+        ), // Animate from 0% to 100% if it is other player, 50% to 100% if it is local player
+        duration: anim_constant.winnerFadeIn,
+        curve: Curves.easeIn,
+        builder: (context, opacity, child) {
+          return Positioned(
+            left: ctl.winnerPosition!.x * tileSize,
+            top: ctl.winnerPosition!.y * tileSize,
+            width: tileSize,
+            height: tileSize,
+            child: Opacity(
+              opacity: opacity,
+              child: child,
+            ),
+          );
+        },
+        // The actual widget you want to show (e.g., a trophy or a glowing box)
+        child: isLocalPlayerWin
+            ? const $AssetsImagesGen().playerBlueWin.image(
+                width: 32,
+                height: 64,
+              )
+            : const $AssetsImagesGen().playerRedWin.image(
+                width: 32,
+                height: 64,
+              ),
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
   }
 }
