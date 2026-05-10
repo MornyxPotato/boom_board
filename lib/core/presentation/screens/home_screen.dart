@@ -1,10 +1,12 @@
 import 'package:boom_board/core/presentation/controllers/home_controller.dart';
 import 'package:boom_board/core/presentation/models/enums/home_panel_type.dart';
+import 'package:boom_board/core/presentation/widgets/home_background_anim.dart';
 import 'package:boom_board/core/presentation/widgets/host_panel.dart';
 import 'package:boom_board/core/presentation/widgets/join_panel.dart';
 import 'package:boom_board/core/presentation/widgets/retro_loading_text.dart';
 import 'package:boom_board/core/presentation/widgets/start_panel.dart';
 import 'package:boom_board/core/style/app_colors.dart';
+import 'package:boom_board/features/simple_mode/presentation/widgets/animated_tagline.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -17,6 +19,8 @@ class HomeScreen extends GetView<HomeController> {
       backgroundColor: retroBackground,
       body: Stack(
         children: [
+          const HomeBackgroundAnim(),
+
           SizedBox(
             width: double.infinity,
             height: double.infinity,
@@ -30,7 +34,12 @@ class HomeScreen extends GetView<HomeController> {
                   // --- LOGO AREA ---
                   // TODO: Replace this Text with Image.asset('assets/logo.png') later
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.only(
+                      left: 36,
+                      right: 24,
+                      top: 16,
+                      bottom: 16,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black,
                       border: Border.all(color: Colors.white, width: 4),
@@ -49,15 +58,7 @@ class HomeScreen extends GetView<HomeController> {
                   ),
                   const SizedBox(height: 16),
                   // The Silent Tutorial Tagline
-                  const Text(
-                    '> HIDE. > SURVIVE. > DESTROY.',
-                    style: TextStyle(
-                      color: retroGreen,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      shadows: [Shadow(color: Colors.black, offset: Offset(2, 2))],
-                    ),
-                  ),
+                  const AnimatedTagline(),
                   const SizedBox(height: 60),
 
                   // --- CONNECTION STATUS ---
