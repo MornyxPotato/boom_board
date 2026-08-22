@@ -35,6 +35,15 @@ ActionLogEntity log(String id) {
   );
 }
 
+ActionLogEntity playerLog(String id, LogActionType type, String playerName) {
+  return ActionLogEntity(
+    id: id,
+    type: type,
+    timestamp: DateTime.fromMillisecondsSinceEpoch(0),
+    data: <String, dynamic>{'playerName': playerName},
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -109,12 +118,60 @@ void main() {
           playerId: 'p-2',
           newHostId: localId,
           playerList: [player(id: localId)],
+          newLogs: const [],
         ),
       );
 
       expect(harness.controller.playerList, hasLength(1));
       expect(harness.controller.hostId, localId);
       expect(harness.controller.isHost, isTrue);
+    });
+
+    test('keeps our own tile when someone leaves mid-game', () async {
+      // This event fires mid-game now that leaving removes a player from the
+      // board, and the broadcast roster carries no positions -- ours is private.
+      // Taking the list raw would blank our avatar off the board every time
+      // anyone walked out.
+      await buildRoom();
+      harness.controller.playerList = [
+        player(id: localId, x: 3, y: 4, hasPositioned: true),
+        player(id: 'p-2'),
+      ];
+
+      harness.controller.onPlayerLeftEventReceived(
+        PlayerLeftEvent(
+          playerId: 'p-2',
+          newHostId: localId,
+          playerList: [player(id: localId, hasPositioned: true)],
+          newLogs: const [],
+        ),
+      );
+
+      expect(harness.playerById(localId).x, 3);
+      expect(harness.playerById(localId).y, 4);
+    });
+
+    test('appends the departure log line', () async {
+      await buildRoom();
+
+      harness.controller.onPlayerLeftEventReceived(
+        PlayerLeftEvent(
+          playerId: 'p-2',
+          newHostId: localId,
+          playerList: [player(id: localId)],
+          newLogs: [
+            ActionLogEntity(
+              id: 'log-1',
+              type: LogActionType.playerLeft,
+              timestamp: DateTime.now(),
+              data: const {'playerId': 'p-2', 'playerName': 'Bob'},
+            ),
+          ],
+        ),
+      );
+
+      expect(harness.controller.actionLogList, hasLength(1));
+      expect(harness.controller.actionLogList.single.type, LogActionType.playerLeft);
     });
   });
 
@@ -250,10 +307,40 @@ void main() {
         PlayerReconnectedEvent(
           playerId: 'p-2',
           playerList: [player(id: localId), player(id: 'p-2')],
+          newLogs: const [],
         ),
       );
 
       expect(harness.playerById('p-2').isDisconnected, isFalse);
+    });
+
+    test('records the reconnect line so the log closes the disconnect', () async {
+      await buildRoom();
+
+      harness.controller.onPlayerReconnectedEventReceived(
+        PlayerReconnectedEvent(
+          playerId: 'p-2',
+          playerList: [player(id: localId), player(id: 'p-2')],
+          newLogs: [playerLog('rc-1', LogActionType.playerReconnected, 'Bob')],
+        ),
+      );
+
+      expect(harness.controller.actionLogList.single.id, 'rc-1');
+      expect(harness.controller.feedLogList.single.id, 'rc-1');
+    });
+
+    test('a rejoin over a live socket carries no log and adds no line', () async {
+      await buildRoom();
+
+      harness.controller.onPlayerReconnectedEventReceived(
+        PlayerReconnectedEvent(
+          playerId: 'p-2',
+          playerList: [player(id: localId), player(id: 'p-2')],
+          newLogs: const [],
+        ),
+      );
+
+      expect(harness.controller.feedLogList, isEmpty);
     });
   });
 
@@ -672,6 +759,38 @@ void main() {
       expect(harness.controller.lockedBombTarget, isNull);
       expect(harness.controller.showEndgameOverlay, isTrue);
       expect(harness.controller.currentPhaseTimeLimit, -1);
+    });
+
+    test('accepts a winner with no position, which is how the hide phase ends', () async {
+      // Reachable since leaving removes a player from the board: the roster can
+      // drop to one during `position`, before anyone has picked a tile. The
+      // server then has no living, positioned player to point at and sends
+      // `winnerPosition: null`, and the survivor's own x/y are still null.
+      // Previously the game could only end out of `processRound`, where every
+      // living player is guaranteed to hold a tile.
+      await buildRoom();
+      harness.controller.currentState = GameState.position;
+      harness.controller.playerList = [player(id: localId, hasPositioned: false)];
+
+      harness.controller.onGameOverEventReceived(
+        GameOverEvent(
+          ranking: [
+            SimpleModeResultEntity(
+              rank: 1,
+              id: localId,
+              name: 'Alice',
+              isAlive: true,
+              isDisconnected: false,
+            ),
+          ],
+          winnerPosition: null,
+        ),
+      );
+
+      expect(harness.controller.currentState, GameState.end);
+      expect(harness.controller.finalRanking.single.name, 'Alice');
+      expect(harness.controller.winnerPosition, isNull);
+      expect(harness.playerById(localId).x, isNull);
     });
   });
 

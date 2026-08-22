@@ -164,6 +164,7 @@ class SimpleModeSocketHandler {
           playerId: dataModel.leftPlayerId,
           newHostId: dataModel.newHostId,
           playerList: dataModel.playerList.toSimpleModeEntity(),
+          newLogs: dataModel.newLogs.map((e) => e.toEntity()).toList(),
         ),
       );
     } catch (e, stackTrace) {
@@ -200,6 +201,7 @@ class SimpleModeSocketHandler {
         PlayerReconnectedEvent(
           playerId: dataModel.playerId,
           playerList: dataModel.playerList.toSimpleModeEntity(),
+          newLogs: dataModel.newLogs.map((e) => e.toEntity()).toList(),
         ),
       );
     } catch (e, stackTrace) {

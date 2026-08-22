@@ -46,6 +46,22 @@ class ActionLogEntity {
     }
   }
 
+  LogPlayerReconnectedData getLogPlayerReconnectedData() {
+    if (type == LogActionType.playerReconnected) {
+      return LogPlayerReconnectedData.fromJson(data);
+    } else {
+      throw Exception('Log data ($type) is not type ${LogActionType.playerReconnected}');
+    }
+  }
+
+  LogPlayerLeftData getLogPlayerLeftData() {
+    if (type == LogActionType.playerLeft) {
+      return LogPlayerLeftData.fromJson(data);
+    } else {
+      throw Exception('Log data ($type) is not type ${LogActionType.playerLeft}');
+    }
+  }
+
   @override
   String toString() {
     return 'ActionLogEntity type: $type, data: $data';
@@ -120,5 +136,29 @@ class LogPlayerDisconnectedData {
 
   static LogPlayerDisconnectedData fromJson(Map<String, dynamic> json) {
     return LogPlayerDisconnectedData(playerName: json['playerName']);
+  }
+}
+
+/// The other half of a disconnect: the same player is answering for themselves
+/// again. Same payload as the disconnect it closes.
+class LogPlayerReconnectedData {
+  final String playerName;
+
+  LogPlayerReconnectedData({required this.playerName});
+
+  static LogPlayerReconnectedData fromJson(Map<String, dynamic> json) {
+    return LogPlayerReconnectedData(playerName: json['playerName']);
+  }
+}
+
+/// A player who gave up their seat mid-game. Same payload as a disconnect, but
+/// a different thing to read: they are off the board for good, not offline.
+class LogPlayerLeftData {
+  final String playerName;
+
+  LogPlayerLeftData({required this.playerName});
+
+  static LogPlayerLeftData fromJson(Map<String, dynamic> json) {
+    return LogPlayerLeftData(playerName: json['playerName']);
   }
 }

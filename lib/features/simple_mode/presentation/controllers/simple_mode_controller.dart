@@ -16,6 +16,7 @@ import 'package:boom_board/core/events/models/socket_disconnected_event.dart';
 import 'package:boom_board/core/events/models/socket_reconnect_attempt_event.dart';
 import 'package:boom_board/core/exceptions/bb_server_exception.dart';
 import 'package:boom_board/features/simple_mode/data/models/enum/game_state.dart';
+import 'package:boom_board/features/simple_mode/data/models/enum/log_action_type.dart';
 import 'package:boom_board/features/simple_mode/domain/constants/animation_constant.dart' as anim_constant;
 import 'package:boom_board/features/simple_mode/domain/entities/action_log_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/animation/active_bomb_drop_entity.dart';
@@ -35,6 +36,7 @@ import 'package:boom_board/features/simple_mode/domain/entities/events/player_re
 import 'package:boom_board/features/simple_mode/domain/entities/events/room_snapshot_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/round_resolved_event.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/events/spectator_changed_event.dart';
+import 'package:boom_board/features/simple_mode/domain/entities/explosion_result_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_player_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/entities/simple_mode_result_entity.dart';
 import 'package:boom_board/features/simple_mode/domain/use_cases/consume_room_snapshot_use_case.dart';
@@ -52,7 +54,7 @@ import 'package:logger/logger.dart';
 
 abstract class SimpleModeIds {
   static const String playerListPanel = 'PLAYER_LIST_PANEL';
-  static const String actionLogPanel = 'ACTION_LOG_PANEL';
+  static const String feedLogPanel = 'FEED_LOG_PANEL';
   static const String boardPanel = 'BOARD_PANEL';
   static const String controlPanel = 'CONTROL_PANEL';
   static const String connectionOverlay = 'CONNECTION_OVERLAY';
@@ -90,7 +92,22 @@ class SimpleModeController extends GetxController {
   // sequence left mid-flight by a background cannot overwrite the snapshot
   // that superseded it.
   int _roundAnimationGeneration = 0;
+  // Animation ids used to be minted from the wall clock, which only held up
+  // because every trigger in the round sequence sat behind an await.
+  // `triggerLaserAnimation` mints a whole burst inside one synchronous loop,
+  // where the clock never ticks -- those ids stayed distinct only because the
+  // coordinates baked into them did. A counter is unique by construction, so
+  // widget keys no longer depend on where the id happens to be minted.
+  int _animationIdCounter = 0;
+  /// Every log the server has sent for this game. Nothing on screen reads
+  /// it -- it is the round's full record, kept for a history/replay view
+  /// later. Only [feedLogList] is shown.
   List<ActionLogEntity> actionLogList = [];
+
+  /// What the player actually reads, in the order it happened: kills, plus
+  /// the two ways a player drops out of the game. The chatter -- every bomb
+  /// that missed, every laser sweep -- stays in [actionLogList] only.
+  List<ActionLogEntity> feedLogList = [];
   List<Coordinate> destroyedTile = [];
   Coordinate? hoveredTile;
   Coordinate? lockedBombTarget;
@@ -156,6 +173,21 @@ class SimpleModeController extends GetxController {
     return localPlayer?.name ?? GetIt.I<IdentityStore>().credentials?.playerName ?? '';
   }
 
+  /// The room to present when re-entering. Prefers the credential slot: it
+  /// records the last entry the server actually bound this socket to, so if the
+  /// two ever disagree (two entries racing each other) the slot is the one that
+  /// matches the seat we are trying to reclaim.
+  ///
+  /// Only ever a bootstrap. A rejoin writes the room it actually landed in back
+  /// to [roomCode], so the two can only disagree until the next one completes
+  /// -- long enough to aim the rejoin, never long enough to leave the screen
+  /// naming one room while the seat lives in another.
+  String get _roomToReclaim {
+    final stored = GetIt.I<IdentityStore>().credentials?.roomCode;
+    if (stored != null && stored.isNotEmpty) return stored;
+    return roomCode;
+  }
+
   bool get isReconnecting => connectionState == RoomConnectionState.reconnecting;
 
   bool get isConnectionLost => connectionState != RoomConnectionState.connected;
@@ -175,18 +207,19 @@ class SimpleModeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    if (Get.arguments is! SimpleModeArguments) {
-      Get.offAllNamed(home);
+
+    final args = Get.arguments;
+    if (args is SimpleModeArguments) {
+      roomCode = args.roomCode;
+      hostId = args.hostId;
+      playerList = args.playerList;
+      spectatorList = args.spectatorList;
+      isSpectator = args.isSpectator;
+
+      subscribeListener();
+    } else if (!_recoverRoomWithoutArguments()) {
       return;
     }
-    final args = Get.arguments as SimpleModeArguments;
-    roomCode = args.roomCode;
-    hostId = args.hostId;
-    playerList = args.playerList;
-    spectatorList = args.spectatorList;
-    isSpectator = args.isSpectator;
-
-    subscribeListener();
 
     // A mid-game entry gets its snapshot the instant the server acks, which is
     // before this controller exists. Pick up anything that landed in the gap.
@@ -194,6 +227,83 @@ class SimpleModeController extends GetxController {
     if (pendingSnapshot != null) {
       applyRoomSnapshot(pendingSnapshot);
     }
+  }
+
+  /// Rebuilds the room from the credential slot when the route arguments are
+  /// gone, returning false when there is nothing left to rebuild from.
+  ///
+  /// The arguments can genuinely go missing: `Get.arguments` is one global slot
+  /// that every dialog, bottom sheet and snackbar overwrites while it is open,
+  /// and it is read here -- from the route's first build -- a frame *after* the
+  /// push that filled it. A frame that never comes (backgrounded mobile Chrome)
+  /// stretches that gap indefinitely. The seat on the server is already taken
+  /// by then, so bouncing home over it leaves a body on the board that nobody
+  /// is driving.
+  ///
+  /// The credential slot is the copy that can be trusted: create/join both
+  /// persist it *before* this route is ever pushed, and it survives a reload.
+  /// Everything else the arguments carried -- roster, host, phase, board, our
+  /// own tile -- comes back in the snapshot.
+  bool _recoverRoomWithoutArguments() {
+    final creds = GetIt.I<IdentityStore>().credentials;
+    if (creds == null || creds.roomCode.isEmpty) {
+      logger.e('Entered the room screen with no arguments and no credentials.');
+      _bailOutToHome();
+      return false;
+    }
+
+    logger.w('Route arguments were lost. Rebuilding room ${creds.roomCode} from the snapshot.');
+    roomCode = creds.roomCode;
+
+    subscribeListener();
+    _hydrateFromSnapshot();
+
+    return true;
+  }
+
+  /// Fills in everything the lost arguments were carrying.
+  ///
+  /// Until the snapshot lands there is no roster, no host and no phase, so this
+  /// borrows the reconnect overlay rather than presenting an empty lobby that
+  /// invites taps. `applyRoomSnapshot` clears it.
+  ///
+  /// A snapshot is the cheap way back in -- it skips the `playerReconnected`
+  /// broadcast and the progression re-check a full join fires at everyone else
+  /// -- but the server answers it from the binding it made at join time, so it
+  /// only works while *this* socket still holds the seat. A socket that dropped
+  /// and has not rejoined yet holds nothing, and the request is refused. That
+  /// is not a dead end: it just means the seat has to be reclaimed the long
+  /// way, which is what `rejoinRoom` does -- with the very credentials this
+  /// recovery has already validated, and owning the overlay and the per-error
+  /// messaging on the way.
+  Future<void> _hydrateFromSnapshot() async {
+    connectionState = RoomConnectionState.reconnecting;
+    connectionError = null;
+    update([SimpleModeIds.connectionOverlay]);
+
+    try {
+      await GetIt.I<RequestSnapshotUseCase>().call();
+    } catch (e, stackTrace) {
+      logger.w('Snapshot rebuild failed. Reclaiming the seat instead.', error: e, stackTrace: stackTrace);
+      await rejoinRoom();
+    }
+  }
+
+  /// Gives up the seat and goes home, for when even the credentials are gone.
+  ///
+  /// Both halves are deliberate. `leaveRoom` is keyed on the socket rather than
+  /// on our identity, so it still releases the seat we can no longer name --
+  /// without it the server keeps waiting on a player who is not there and every
+  /// round burns the full phase timer. And the redirect is deferred out of the
+  /// build: onInit runs while this route is being built, and navigating from
+  /// there makes GetX file this controller under the *home* route instead of
+  /// this one. It would then never be cleaned up, and since `Get.put` refuses
+  /// to replace a live registration, every later join this session would be
+  /// handed this same half-built controller -- an empty room code, no
+  /// listeners, nothing to play with.
+  void _bailOutToHome() {
+    leaveRoom();
+    WidgetsBinding.instance.addPostFrameCallback((_) => Get.offAllNamed(home));
   }
 
   @override
@@ -251,6 +361,7 @@ class SimpleModeController extends GetxController {
 
   void resetRound() {
     actionLogList = [];
+    feedLogList = [];
     destroyedTile = [];
     finalRanking = [];
     showEndgameOverlay = true;
@@ -277,6 +388,14 @@ class SimpleModeController extends GetxController {
     }
   }
 
+  /// True when the server refused an action because this socket holds no seat.
+  ///
+  /// The binding is gone, so nothing this client sends can land until the seat
+  /// is reclaimed -- and reclaiming it is the same move the lost-arguments
+  /// recovery makes. Worth separating from an ordinary failure, which a retry
+  /// of the action itself would fix.
+  bool _isUnseated(Object e) => e is BBServerException && e.errorType == 'PLAYER_IS_NOT_IN_A_ROOM';
+
   void startGame() async {
     if (playerList.length <= 1) return;
     if (isHost) {
@@ -284,6 +403,7 @@ class SimpleModeController extends GetxController {
         await GetIt.I<StartGameUseCase>().call(StartGameParams(roomCode: roomCode));
       } catch (e, stackTrace) {
         logger.e('startGame error.', error: e, stackTrace: stackTrace);
+        if (_isUnseated(e)) rejoinRoom();
       }
     }
   }
@@ -358,6 +478,7 @@ class SimpleModeController extends GetxController {
       await GetIt.I<ResetGameUseCase>().call(ResetGameParams(roomCode: roomCode));
     } catch (e, stackTrace) {
       logger.e('backToLobby error.', error: e, stackTrace: stackTrace);
+      if (_isUnseated(e)) rejoinRoom();
     }
   }
 
@@ -387,9 +508,15 @@ class SimpleModeController extends GetxController {
 
   void onPlayerLeftEventReceived(PlayerLeftEvent event) {
     logger.d('onPlayerLeftEventReceived called with $event');
-    playerList = event.playerList;
+    // Through `_applyServerPlayerList`, not a bare assignment: this now fires
+    // mid-game too, and the broadcast roster carries no positions -- so taking
+    // it raw would blank our own avatar off the board every time anyone left.
+    _applyServerPlayerList(event.playerList);
     hostId = event.newHostId;
-    update([SimpleModeIds.playerListPanel, SimpleModeIds.controlPanel]);
+    _recordLogs(event.newLogs);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.feedLogPanel, SimpleModeIds.controlPanel]);
+
+    if (event.newLogs.isNotEmpty) _scrollToBottom();
   }
 
   void onPlayerReadyEventReceived(PlayerReadyEvent event) {
@@ -418,8 +545,8 @@ class SimpleModeController extends GetxController {
     // at winning -- the roster just shows them as offline.
     _applyServerPlayerList(event.playerList);
     hostId = event.newHostId;
-    actionLogList.addAll(event.newLogs);
-    update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel, SimpleModeIds.controlPanel]);
+    _recordLogs(event.newLogs);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.feedLogPanel, SimpleModeIds.controlPanel]);
 
     _scrollToBottom();
   }
@@ -427,7 +554,10 @@ class SimpleModeController extends GetxController {
   void onPlayerReconnectedEventReceived(PlayerReconnectedEvent event) {
     logger.d('onPlayerReconnectedEventReceived called with $event');
     _applyServerPlayerList(event.playerList);
-    update([SimpleModeIds.playerListPanel, SimpleModeIds.controlPanel]);
+    _recordLogs(event.newLogs);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.feedLogPanel, SimpleModeIds.controlPanel]);
+
+    if (event.newLogs.isNotEmpty) _scrollToBottom();
   }
 
   void onPlayerRenamedEventReceived(PlayerRenamedEvent event) {
@@ -480,6 +610,7 @@ class SimpleModeController extends GetxController {
     // The snapshot carries the current round's logs, so replace rather than
     // append -- appending would duplicate whatever we already saw this round.
     actionLogList = event.logs;
+    feedLogList = event.logs.where(_isFeedLog).toList();
     finalRanking = event.ranking;
     winnerPosition = event.winnerPosition;
     showEndgameOverlay = event.state == GameState.end;
@@ -527,7 +658,7 @@ class SimpleModeController extends GetxController {
 
     update([
       SimpleModeIds.playerListPanel,
-      SimpleModeIds.actionLogPanel,
+      SimpleModeIds.feedLogPanel,
       SimpleModeIds.boardPanel,
       SimpleModeIds.controlPanel,
       SimpleModeIds.connectionOverlay,
@@ -584,45 +715,62 @@ class SimpleModeController extends GetxController {
     int? localPlayerX = localPlayer?.x;
     int? localPlayerY = localPlayer?.y;
     // SEQUENTIAL EXPLOSION LOGIC
-    // Even in a temporary UI, we use async/await inside a loop to process them one-by-one
-    for (var explosion in event.explosionList) {
-      // NOTE: When you build the real UI, this is where you trigger the
-      // visual bomb explosion animation on the specific grid coordinates (explosion.x, explosion.y)
+    // One iteration per bomb thrown, not per victim -- see `_groupByBomb`. The
+    // awaits inside keep the round playing out one bomb at a time.
+    for (final hits in _groupByBomb(event.explosionList)) {
+      // Every entry in the group shares the bomber and the target tile.
+      final bomb = hits.first;
 
       int startX = -1;
       int startY = -1;
 
-      if (explosion.bomberId == localPlayerId) {
+      if (bomb.bomberId == localPlayerId) {
         startX = localPlayerX ?? -1;
         startY = localPlayerY ?? -1;
       }
       triggerBombAnimation(
-        explosion.bomberId,
+        bomb.bomberId,
         startX,
         startY,
-        explosion.x,
-        explosion.y,
+        bomb.x,
+        bomb.y,
       );
 
       // Wait for the "animation" to finish before evaluating the result
       await Future.delayed(anim_constant.bombDrop);
       if (generation != _roundAnimationGeneration) return;
 
-      if (explosion.bomberId == localPlayerId) {
+      if (bomb.bomberId == localPlayerId) {
         lockedBombTarget = null;
       }
 
-      triggerExplosionEffect(explosion.x, explosion.y);
+      triggerExplosionEffect(bomb.x, bomb.y);
 
-      if (explosion.isHit && explosion.victimId != null) {
+      // Everyone this one bomb killed, in the order the server resolved them.
+      final victimNames = <String>[];
+      for (final hit in hits) {
+        if (!hit.isHit || hit.victimId == null) continue;
+
         // Update the victim's status in real-time
-        final victimIndex = playerList.indexWhere((p) => p.id == explosion.victimId);
+        final victimIndex = playerList.indexWhere((p) => p.id == hit.victimId);
         if (victimIndex != -1) {
           playerList[victimIndex] = playerList[victimIndex].copyWith(isAlive: false);
-          update([SimpleModeIds.playerListPanel]);
-
-          triggerDeathAnimation(explosion.x, explosion.y);
+          victimNames.add(playerList[victimIndex].name);
         }
+
+        // The kill line lands with the explosion that caused it. Waiting for
+        // the tail of this handler would dump every kill of the round on the
+        // player at once, seconds after the board already showed them.
+        _showKillLogFor(event.newLogs, hit.victimId!);
+      }
+
+      if (victimNames.isNotEmpty) {
+        update([SimpleModeIds.playerListPanel]);
+
+        // One skull for the tile, carrying every name. They all died on the
+        // same tile -- a ghost each would draw them exactly on top of one
+        // another, and the name tags would overprint into nothing legible.
+        triggerDeathAnimation(bomb.x, bomb.y, playerNames: victimNames);
       }
 
       await Future.delayed(anim_constant.explosionSettle);
@@ -655,10 +803,10 @@ class SimpleModeController extends GetxController {
         y: localPlayerY,
       );
     }
-    actionLogList.addAll(event.newLogs);
+    _recordLogs(event.newLogs);
 
     currentRound = event.roundNumber;
-    update([SimpleModeIds.playerListPanel, SimpleModeIds.actionLogPanel, SimpleModeIds.controlPanel]);
+    update([SimpleModeIds.playerListPanel, SimpleModeIds.feedLogPanel, SimpleModeIds.controlPanel]);
 
     _scrollToBottom();
   }
@@ -688,7 +836,7 @@ class SimpleModeController extends GetxController {
       SimpleModeIds.controlPanel,
       SimpleModeIds.playerListPanel,
       SimpleModeIds.boardPanel,
-      SimpleModeIds.actionLogPanel,
+      SimpleModeIds.feedLogPanel,
     ]);
   }
 
@@ -737,7 +885,7 @@ class SimpleModeController extends GetxController {
   }
 
   void _onSocketReconnected(SocketConnectedEvent event) {
-    logger.d('Socket is back up. Reclaiming our seat in $roomCode.');
+    logger.d('Socket is back up. Reclaiming our seat in $_roomToReclaim.');
     // The socket came back with a fresh id and no idea who we are, so the seat
     // is only ours again once joinRoom validates the stored credentials.
     rejoinRoom();
@@ -755,12 +903,16 @@ class SimpleModeController extends GetxController {
 
     try {
       final result = await GetIt.I<JoinRoomUseCase>().call(
-        JoinRoomParams(playerName: localPlayerName, roomCode: roomCode),
+        JoinRoomParams(playerName: localPlayerName, roomCode: _roomToReclaim),
       );
 
       // Only the fields the snapshot doesn't carry are taken from the ack --
       // the private roomSnapshot that follows is the authoritative view and
-      // will overwrite the rest.
+      // will overwrite the rest. The room code is one of them, and taking it
+      // here is what stops `roomCode` and the credential slot drifting apart:
+      // whichever room we actually landed in becomes the only one on record,
+      // rather than the screen naming one room while the seat sits in another.
+      roomCode = result.roomCode;
       isSpectator = result.isSpectator;
       hostId = result.hostId;
 
@@ -836,6 +988,89 @@ class SimpleModeController extends GetxController {
     update([SimpleModeIds.boardPanel]);
   }
 
+  /// Splits a round's explosion list into one entry per bomb thrown.
+  ///
+  /// The server reports a hit per victim, so a bomb that lands on a tile two
+  /// players are sharing arrives as two entries with the same bomber and the
+  /// same coordinates. Animating each as its own throw drew two bombs falling
+  /// on one tile, flashed the explosion twice, and stretched the round by a
+  /// full bomb per extra kill.
+  ///
+  /// Grouped on consecutive runs rather than by bomber, so the round's order
+  /// survives even if a later mode lets a player throw more than once.
+  List<List<ExplosionResultEntity>> _groupByBomb(List<ExplosionResultEntity> explosions) {
+    final List<List<ExplosionResultEntity>> groups = [];
+
+    for (final explosion in explosions) {
+      final current = groups.isEmpty ? null : groups.last;
+      final isSameBomb = current != null &&
+          current.first.bomberId == explosion.bomberId &&
+          current.first.x == explosion.x &&
+          current.first.y == explosion.y;
+
+      if (isSameBomb) {
+        current.add(explosion);
+      } else {
+        groups.add([explosion]);
+      }
+    }
+
+    return groups;
+  }
+
+  /// Which log types earn a line on screen. See [feedLogList].
+  bool _isFeedLog(ActionLogEntity log) =>
+      log.type == LogActionType.playerEliminated ||
+      log.type == LogActionType.playerDisconnected ||
+      log.type == LogActionType.playerReconnected ||
+      log.type == LogActionType.playerLeft;
+
+  bool _isKillLog(ActionLogEntity log) => log.type == LogActionType.playerEliminated;
+
+  /// Keeps the full server log, and mirrors the lines worth showing into the
+  /// feed the player reads. Kills already shown mid-animation are skipped, so
+  /// calling this with a whole round's logs is safe.
+  ///
+  /// Paints nothing: every caller is a handler that already updates the feed
+  /// panel and scrolls once it has applied the rest of the event, so doing it
+  /// per log here would just queue the same repaint and scroll N times over.
+  void _recordLogs(List<ActionLogEntity> logs) {
+    actionLogList.addAll(logs);
+    for (final log in logs) {
+      if (_isFeedLog(log)) _appendFeedLog(log);
+    }
+  }
+
+  /// Shows the kill line for one victim out of the round's logs.
+  ///
+  /// Matched on the raw payload rather than the typed accessor on purpose:
+  /// this runs mid-animation, and a malformed log must not be able to throw
+  /// the round sequence off the rails. Anything missed here still gets picked
+  /// up by [_recordLogs] at the end of the round.
+  void _showKillLogFor(List<ActionLogEntity> roundLogs, String victimId) {
+    for (final log in roundLogs) {
+      if (_isKillLog(log) && log.data['victimId'] == victimId) {
+        // The one caller that has to paint for itself: this lands mid-round,
+        // seconds before the handler's own update at the end of the sequence,
+        // and the whole point is that the line shows with its explosion.
+        if (_appendFeedLog(log)) {
+          update([SimpleModeIds.feedLogPanel]);
+          _scrollToBottom();
+        }
+        return;
+      }
+    }
+  }
+
+  /// Adds a line to the feed if it isn't already there, and reports whether it
+  /// actually landed -- a kill shown mid-animation is skipped when the round's
+  /// full log arrives behind it.
+  bool _appendFeedLog(ActionLogEntity log) {
+    if (feedLogList.any((e) => e.id == log.id)) return false;
+    feedLogList.add(log);
+    return true;
+  }
+
   void _scrollToBottom() {
     // We use addPostFrameCallback because we need to wait for Flutter to
     // actually build the new log text widgets before we can scroll past them!
@@ -865,7 +1100,7 @@ class SimpleModeController extends GetxController {
   // Helper to trigger the animation
   void triggerBombAnimation(String bomberId, int startX, int startY, int targetX, int targetY) {
     final drop = ActiveBombDropEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString() + bomberId,
+      id: '${bomberId}_${_animationIdCounter++}',
       bomberId: bomberId,
       startX: startX,
       startY: startY,
@@ -884,7 +1119,7 @@ class SimpleModeController extends GetxController {
   }
 
   void triggerExplosionEffect(int x, int y) {
-    final id = 'exp_${x}_${y}_${DateTime.now().millisecondsSinceEpoch}';
+    final id = 'exp_${x}_${y}_${_animationIdCounter++}';
     activeExplosions.add(ActiveTileAnimationEntity(id: id, x: x, y: y));
     update([SimpleModeIds.boardPanel]);
 
@@ -895,9 +1130,9 @@ class SimpleModeController extends GetxController {
     });
   }
 
-  void triggerDeathAnimation(int x, int y) {
-    final id = 'death_${x}_${y}_${DateTime.now().millisecondsSinceEpoch}';
-    activeDeaths.add(ActiveTileAnimationEntity(id: id, x: x, y: y));
+  void triggerDeathAnimation(int x, int y, {List<String> playerNames = const []}) {
+    final id = 'death_${x}_${y}_${_animationIdCounter++}';
+    activeDeaths.add(ActiveTileAnimationEntity(id: id, x: x, y: y, playerNames: playerNames));
     update([SimpleModeIds.boardPanel]);
 
     // Delay for the animation duration. When it finishes, we remove the ghost!
@@ -909,7 +1144,7 @@ class SimpleModeController extends GetxController {
 
   void triggerLaserAnimation(List<Coordinate> tiles) {
     for (var tile in tiles) {
-      final id = 'laser_${tile.x}_${tile.y}_${DateTime.now().millisecondsSinceEpoch}';
+      final id = 'laser_${tile.x}_${tile.y}_${_animationIdCounter++}';
       activeLasers.add(ActiveTileAnimationEntity(id: id, x: tile.x, y: tile.y));
     }
     update([SimpleModeIds.boardPanel]);
